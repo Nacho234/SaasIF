@@ -22,3 +22,7 @@ npm-debug.log*
 
 # TypeScript
 *.tsbuildinfo
+
+# Prisma (cliente generado)
+apps/api/generated
+.prisma

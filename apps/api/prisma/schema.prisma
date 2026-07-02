@@ -1,0 +1,149 @@
+// Schema base del SaaS Mostrador.
+// Fase 1-2: tablas core (negocios, sucursales, usuarios, planes, suscripciones, settings).
+// Las tablas operativas (products, sales, cash_registers, etc.) se agregan en fases
+// posteriores, SIEMPRE con `businessId` (y `branchId` donde corresponda) para el
+// aislamiento multi-tenant. Ver docs/HANDOFF-arquitectura-produccion.md.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum BusinessStatus {
+  active
+  suspended
+  cancelled
+}
+
+enum UserRole {
+  admin
+  manager
+  seller
+}
+
+enum UserStatus {
+  active
+  inactive
+}
+
+enum SubscriptionStatus {
+  trial
+  active
+  past_due
+  cancelled
+  expired
+  blocked
+}
+
+/// Cada suscriptor = un negocio. Es la raíz del aislamiento multi-tenant.
+model Business {
+  id        String         @id @default(cuid())
+  name      String
+  category  String         @default("")
+  cuit      String         @default("")
+  phone     String         @default("")
+  email     String         @default("")
+  address   String         @default("")
+  logoUrl   String?
+  status    BusinessStatus @default(active)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  settings      BusinessSettings?
+  branches      Branch[]
+  users         User[]
+  subscription  Subscription?
+
+  @@map("businesses")
+}
+
+model BusinessSettings {
+  id                     String   @id @default(cuid())
+  businessId             String   @unique
+  currency               String   @default("ARS")
+  primaryColor           String   @default("#2563eb")
+  theme                  String   @default("light")
+  requireOpenCashToSell  Boolean  @default(true)
+  allowNegativeStock     Boolean  @default(false)
+  allowDiscounts         Boolean  @default(true)
+  maxDiscountPercent     Int      @default(20)
+  allowCustomerCredit    Boolean  @default(true)
+  defaultMinStock        Int      @default(5)
+  receiptMessage         String   @default("¡Gracias por tu compra!")
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@map("business_settings")
+}
+
+model Branch {
+  id         String   @id @default(cuid())
+  businessId String
+  name       String
+  address    String   @default("")
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@map("branches")
+}
+
+/// MVP: un usuario pertenece a un negocio con un rol. La membresía multi-negocio
+/// (tabla user_businesses) queda como extensión futura si un usuario administra varios.
+model User {
+  id           String     @id @default(cuid())
+  businessId   String
+  email        String     @unique
+  passwordHash String
+  name         String
+  role         UserRole   @default(seller)
+  status       UserStatus @default(active)
+  lastLoginAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@map("users")
+}
+
+model Plan {
+  id           String   @id @default(cuid())
+  code         String   @unique
+  name         String
+  priceMonthly Int      @default(0)
+  maxUsers     Int      @default(2)
+  maxBranches  Int      @default(1)
+  features     Json     @default("[]")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+model Subscription {
+  id               String             @id @default(cuid())
+  businessId       String             @unique
+  planId           String
+  status           SubscriptionStatus @default(trial)
+  trialEndsAt      DateTime?
+  currentPeriodEnd DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  plan     Plan     @relation(fields: [planId], references: [id])
+
+  @@map("subscriptions")
+}

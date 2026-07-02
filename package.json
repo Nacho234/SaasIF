@@ -1,35 +1,20 @@
 {
-  "name": "mostrador-pos",
+  "name": "mostrador",
   "private": true,
   "version": "0.1.0",
-  "type": "module",
-  "description": "PWA de punto de venta y gestión interna para comercios minoristas (demo con datos locales)",
+  "description": "Mostrador — SaaS de punto de venta y gestión para comercios (monorepo)",
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview",
-    "typecheck": "tsc -b --noEmit",
-    "smoke": "NODE_OPTIONS=--localstorage-file=/tmp/mostrador-smoke-ls.json tsx --tsconfig tsconfig.app.json scripts/smoke.ts"
+    "dev:web": "npm run dev -w @mostrador/web",
+    "dev:api": "npm run start:dev -w @mostrador/api",
+    "build:web": "npm run build -w @mostrador/web",
+    "build:api": "npm run build -w @mostrador/api",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "smoke": "npm run smoke -w @mostrador/web"
   },
-  "dependencies": {
-    "clsx": "^2.1.1",
-    "date-fns": "^4.1.0",
-    "lucide-react": "^0.525.0",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "react-router-dom": "^7.6.3",
-    "zustand": "^5.0.6"
-  },
-  "devDependencies": {
-    "@tailwindcss/vite": "^4.1.11",
-    "@types/node": "^26.1.0",
-    "@types/react": "^19.1.8",
-    "@types/react-dom": "^19.1.6",
-    "@vitejs/plugin-react": "^4.6.0",
-    "tailwindcss": "^4.1.11",
-    "tsx": "^4.22.4",
-    "typescript": "~5.8.3",
-    "vite": "^6.3.5",
-    "vite-plugin-pwa": "^1.0.0"
+  "engines": {
+    "node": ">=20"
   }
 }
