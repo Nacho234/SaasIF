@@ -57,6 +57,9 @@ model Business {
   branches      Branch[]
   users         User[]
   subscription  Subscription?
+  categories    Category[]
+  brands        Brand[]
+  products      Product[]
 
   @@map("businesses")
 }
@@ -146,4 +149,70 @@ model Subscription {
   plan     Plan     @relation(fields: [planId], references: [id])
 
   @@map("subscriptions")
+}
+
+// --- Catálogo (dominio Productos) — todo aislado por businessId ---
+
+model Category {
+  id          String   @id @default(cuid())
+  businessId  String
+  name        String
+  description String   @default("")
+  color       String   @default("#64748b")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  products Product[]
+
+  @@index([businessId])
+  @@map("categories")
+}
+
+model Brand {
+  id          String   @id @default(cuid())
+  businessId  String
+  name        String
+  description String   @default("")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  products Product[]
+
+  @@index([businessId])
+  @@map("brands")
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  businessId  String
+  sku         String
+  barcode     String   @default("")
+  name        String
+  description String   @default("")
+  categoryId  String?
+  brandId     String?
+  costPrice   Decimal  @default(0) @db.Decimal(14, 2)
+  salePrice   Decimal  @default(0) @db.Decimal(14, 2)
+  stock       Int      @default(0)
+  minStock    Int      @default(0)
+  imageUrl    String?
+  isActive    Boolean  @default(true)
+  isFavorite  Boolean  @default(false)
+  notes       String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  brand    Brand?    @relation(fields: [brandId], references: [id], onDelete: SetNull)
+
+  // SKU único por negocio (permite mismo SKU en negocios distintos).
+  @@unique([businessId, sku])
+  @@index([businessId])
+  @@index([businessId, categoryId])
+  @@map("products")
 }
