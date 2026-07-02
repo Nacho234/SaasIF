@@ -1,8 +1,10 @@
 import type {
   CashMovementType,
+  CashRegisterStatus,
   ExpenseCategory,
   InventoryMovementType,
   NotificationType,
+  ProcessorId,
   PromotionType,
   PurchaseStatus,
   RefundMethod,
@@ -30,6 +32,25 @@ export const CASH_MOVEMENT_LABELS: Record<CashMovementType, string> = {
   debt_payment: 'Pago de deuda',
   correction: 'Corrección',
   closing: 'Cierre',
+};
+
+export const CASH_STATUS_LABELS: Record<CashRegisterStatus, string> = {
+  open: 'Abierta',
+  closed: 'Cerrada',
+  closed_with_difference: 'Cerrada con diferencia',
+  reopened: 'Reabierta',
+  cancelled: 'Anulada',
+};
+
+export const PROCESSOR_LABELS: Record<ProcessorId, string> = {
+  posnet: 'Posnet',
+  lapos: 'LaPos',
+  payway: 'Payway',
+  viumi: 'viüMi',
+  mercadopago_point: 'Mercado Pago Point',
+  getnet: 'Getnet',
+  fiserv: 'Fiserv',
+  other: 'Otra terminal',
 };
 
 export const INVENTORY_MOVEMENT_LABELS: Record<InventoryMovementType, string> = {

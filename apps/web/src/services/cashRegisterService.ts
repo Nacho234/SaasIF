@@ -1,4 +1,11 @@
-import type { CashMovement, CashMovementType, CashRegister, PaymentMethodId } from '@/types';
+import type {
+  CashClosure,
+  CashMovement,
+  CashMovementType,
+  CashRegister,
+  PaymentMethodId,
+  PaymentMethodVerification,
+} from '@/types';
 import { selectOpenRegister, useCashStore } from '@/store/cashStore';
 import { useAuthStore } from '@/store/authStore';
 import { useBusinessStore } from '@/store/businessStore';
@@ -6,6 +13,7 @@ import { generateCashNumber, generateId } from '@/utils/id';
 import { round2 } from '@/utils/calc';
 import { logAudit } from './auditService';
 import { pushNotification } from './notificationService';
+import { getStockSummaryForRegister, nextClosureVersion } from './cashClosureService';
 import { ROUTES } from '@/constants/routes';
 
 export interface RegisterSummary {
@@ -190,21 +198,64 @@ export function addCashMovement(input: {
   return { ok: true };
 }
 
-export function closeRegister(input: {
-  countedCash: number;
+export interface CloseRegisterInput {
+  countedCash: number | null;
   notes: string;
-}): { ok: boolean; error?: string; register?: CashRegister } {
+  paymentVerifications?: PaymentMethodVerification[];
+  employeeSignature?: string | null;
+  managerSignature?: string | null;
+}
+
+export interface CloseRegisterResult {
+  ok: boolean;
+  error?: string;
+  register?: CashRegister;
+  closure?: CashClosure;
+}
+
+/**
+ * Cierra la caja abierta aplicando las reglas de configuración (arqueo, diferencia,
+ * terminales, firmas), persiste un snapshot inmutable (CashClosure) y deja auditoría.
+ * Sirve tanto para el primer cierre como para un cierre posterior a una reapertura.
+ */
+export function closeRegister(input: CloseRegisterInput): CloseRegisterResult {
   const user = useAuthStore.getState().user;
   if (!user) return { ok: false, error: 'No hay sesión activa.' };
   const register = getOpenRegister();
   if (!register) return { ok: false, error: 'No hay caja abierta para cerrar.' };
-  if (input.countedCash < 0) return { ok: false, error: 'El efectivo contado no puede ser negativo.' };
+
+  const { settings } = useBusinessStore.getState();
+
+  // Arqueo obligatorio.
+  if (settings.requireCashCount && (input.countedCash == null || Number.isNaN(input.countedCash))) {
+    return { ok: false, error: 'El arqueo es obligatorio: ingresá el efectivo contado.' };
+  }
+  const countedCash = input.countedCash == null || Number.isNaN(input.countedCash) ? 0 : input.countedCash;
+  if (countedCash < 0) return { ok: false, error: 'El efectivo contado no puede ser negativo.' };
 
   const summary = getRegisterSummary(register.id);
-  const difference = round2(input.countedCash - summary.expectedCash);
-  const { settings } = useBusinessStore.getState();
+  const difference = round2(countedCash - summary.expectedCash);
+
+  // Reglas de diferencia.
+  if (difference !== 0 && !settings.allowCloseWithDifference) {
+    return { ok: false, error: 'No se permite cerrar caja con diferencia. Revisá el arqueo.' };
+  }
   if (difference !== 0 && settings.requireNoteOnCashDifference && !input.notes.trim()) {
     return { ok: false, error: 'Hay una diferencia de caja: la observación es obligatoria.' };
+  }
+
+  // Cierre de terminales obligatorio si la configuración lo pide.
+  const terminals = useCashStore.getState().terminalClosures.filter((t) => t.cashRegisterId === register.id);
+  if (settings.requireTerminalClosure && terminals.length === 0) {
+    return { ok: false, error: 'La configuración exige cargar el cierre de terminales antes de cerrar la caja.' };
+  }
+
+  // Firmas obligatorias.
+  if (settings.requireEmployeeSignature && !input.employeeSignature?.trim()) {
+    return { ok: false, error: 'Falta la firma del empleado.' };
+  }
+  if (settings.requireManagerSignature && !input.managerSignature?.trim()) {
+    return { ok: false, error: 'Falta la firma del encargado.' };
   }
 
   const now = new Date().toISOString();
@@ -229,11 +280,53 @@ export function closeRegister(input: {
     closedById: user.id,
     closedByName: user.name,
     expectedCash: summary.expectedCash,
-    countedCash: round2(input.countedCash),
+    countedCash: round2(countedCash),
     difference,
     status,
     closingNotes: input.notes,
   });
+
+  // Snapshot inmutable (Hoja de Cierre Diario).
+  const stock = getStockSummaryForRegister(register.id);
+  const salesTotal = round2(Object.values(summary.salesByMethod).reduce((a, b) => a + (b ?? 0), 0));
+  const closure: CashClosure = {
+    id: generateId(),
+    cashRegisterId: register.id,
+    registerNumber: register.number,
+    version: nextClosureVersion(register.id),
+    openedAt: register.openedAt,
+    closedAt: now,
+    openedByName: register.openedByName,
+    closedByName: user.name,
+    openingAmount: register.openingAmount,
+    expectedCash: summary.expectedCash,
+    countedCash: round2(countedCash),
+    cashDifference: difference,
+    salesCount: summary.salesCount,
+    salesTotal,
+    salesByMethod: summary.salesByMethod,
+    manualIncome: summary.manualIncome,
+    expensesTotal: summary.expensesTotal,
+    withdrawals: summary.withdrawals,
+    refunds: summary.refunds,
+    cancellations: summary.cancellations,
+    debtPayments: summary.debtPayments,
+    // ARCA no conectado: todo se considera ticket interno.
+    internalTicketsTotal: salesTotal,
+    fiscalInvoicesTotal: 0,
+    paymentVerifications: input.paymentVerifications ?? [],
+    terminalClosures: terminals,
+    unitsSold: stock.unitsSold,
+    productsSoldCount: stock.productsSoldCount,
+    inventoryMovementsCount: stock.inventoryMovementsCount,
+    employeeSignature: input.employeeSignature?.trim() || null,
+    managerSignature: input.managerSignature?.trim() || null,
+    notes: input.notes,
+    status,
+    createdAt: now,
+  };
+  store.addClosure(closure);
+
   logAudit({
     action: 'cash_closed',
     module: 'cash',
@@ -242,7 +335,7 @@ export function closeRegister(input: {
         ? `Cerró la caja ${register.number} sin diferencias`
         : `Cerró la caja ${register.number} con diferencia`,
     severity: difference === 0 ? 'success' : 'warning',
-    metadata: { register: register.number, expected: summary.expectedCash, counted: input.countedCash, difference },
+    metadata: { register: register.number, expected: summary.expectedCash, counted: countedCash, difference },
   });
   if (difference !== 0) {
     pushNotification({
@@ -253,5 +346,5 @@ export function closeRegister(input: {
     });
   }
   const updated = useCashStore.getState().registers.find((r) => r.id === register.id);
-  return { ok: true, register: updated };
+  return { ok: true, register: updated, closure };
 }

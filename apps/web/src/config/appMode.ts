@@ -10,7 +10,8 @@
  */
 export type AppMode = 'demo' | 'prod';
 
-export const APP_MODE: AppMode = import.meta.env.VITE_APP_MODE === 'prod' ? 'prod' : 'demo';
+// `import.meta.env?.` con optional chaining para no romper fuera de Vite (ej. scripts en Node).
+export const APP_MODE: AppMode = import.meta.env?.VITE_APP_MODE === 'prod' ? 'prod' : 'demo';
 
 export const isDemoMode = APP_MODE === 'demo';
 export const isProdMode = APP_MODE === 'prod';

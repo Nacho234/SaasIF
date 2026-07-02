@@ -23,6 +23,7 @@ import { cn } from '@/utils/cn';
 const TABS = [
   { id: 'general', label: 'Negocio' },
   { id: 'sales', label: 'Caja y ventas' },
+  { id: 'close', label: 'Cierre de caja' },
   { id: 'receipt', label: 'Ticket' },
   { id: 'appearance', label: 'Apariencia' },
 ];
@@ -195,6 +196,55 @@ export function SettingsPage() {
                   label={m.label}
                 />
               ))}
+            </CardBody>
+          </Card>
+        </div>
+      )}
+
+      {tab === 'close' && (
+        <div className="flex flex-col gap-4">
+          <Card>
+            <CardHeader title="Arqueo y diferencias" />
+            <CardBody className="flex flex-col gap-4">
+              <Switch checked={draft.requireCashCount} onChange={(v) => set({ requireCashCount: v })} label="Requerir arqueo para cerrar caja" description="Obliga a contar el efectivo antes de cerrar" />
+              <Switch checked={draft.requireNoteOnCashDifference} onChange={(v) => set({ requireNoteOnCashDifference: v })} label="Observación obligatoria si hay diferencia" />
+              <Switch checked={draft.allowCloseWithDifference} onChange={(v) => set({ allowCloseWithDifference: v })} label="Permitir cerrar caja con diferencia" description="Si está apagado, no se puede cerrar hasta que el arqueo coincida" />
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader title="Cierre de terminales" subtitle="Conciliación de Posnet, LaPos, Payway, etc." />
+            <CardBody className="flex flex-col gap-4">
+              <Switch checked={draft.requireTerminalClosure} onChange={(v) => set({ requireTerminalClosure: v })} label="Requerir cierre de terminales para cerrar caja" />
+              <Select
+                label="Modo del cierre de terminales"
+                value={draft.terminalClosureMode}
+                onChange={(e) => set({ terminalClosureMode: e.target.value as 'simple' | 'advanced' })}
+                options={[
+                  { value: 'simple', label: 'Simple (solo confirmar totales)' },
+                  { value: 'advanced', label: 'Avanzado (lote, número y totales por medio)' },
+                ]}
+                containerClassName="max-w-sm"
+              />
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader title="Firmas y reapertura" />
+            <CardBody className="flex flex-col gap-4">
+              <Switch checked={draft.requireEmployeeSignature} onChange={(v) => set({ requireEmployeeSignature: v })} label="Requerir firma del empleado" />
+              <Switch checked={draft.requireManagerSignature} onChange={(v) => set({ requireManagerSignature: v })} label="Requerir firma del encargado" />
+              <Switch checked={draft.allowReopenCash} onChange={(v) => set({ allowReopenCash: v })} label="Permitir reabrir cajas cerradas" />
+              <Switch checked={draft.reopenOnlyAdmin} onChange={(v) => set({ reopenOnlyAdmin: v })} label="Solo un administrador puede reabrir caja" />
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader title="Hoja de cierre" />
+            <CardBody className="flex flex-col gap-4">
+              <Switch checked={draft.autoGeneratePdf} onChange={(v) => set({ autoGeneratePdf: v })} label="Abrir la hoja de cierre al cerrar caja" description="Muestra la hoja lista para imprimir / guardar como PDF" />
+              <Switch checked={draft.showFiscalSummary} onChange={(v) => set({ showFiscalSummary: v })} label="Mostrar resumen fiscal en la hoja" description="ARCA no está conectado: por ahora todo es ticket interno" />
+              <Switch checked={draft.showStockSummary} onChange={(v) => set({ showStockSummary: v })} label="Mostrar resumen de stock en la hoja" />
             </CardBody>
           </Card>
         </div>

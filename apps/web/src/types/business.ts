@@ -29,6 +29,18 @@ export interface BusinessSettings {
   allowSellerOpenCash: boolean;
   allowSellerCloseCash: boolean;
   requireNoteOnCashDifference: boolean;
+  // Caja y cierre (arqueo, terminales, hoja de cierre)
+  requireCashCount: boolean;
+  allowCloseWithDifference: boolean;
+  requireTerminalClosure: boolean;
+  terminalClosureMode: 'simple' | 'advanced';
+  requireEmployeeSignature: boolean;
+  requireManagerSignature: boolean;
+  allowReopenCash: boolean;
+  reopenOnlyAdmin: boolean;
+  autoGeneratePdf: boolean;
+  showFiscalSummary: boolean;
+  showStockSummary: boolean;
   // Ventas
   allowNegativeStock: boolean;
   allowDiscounts: boolean;
