@@ -1,0 +1,24 @@
+# Dependencias
+node_modules
+
+# Build
+dist
+dev-dist
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / SO
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea
+
+# Env (por si en el futuro se agregan claves)
+.env
+.env.local
+.env.*.local
+
+# TypeScript
+*.tsbuildinfo
