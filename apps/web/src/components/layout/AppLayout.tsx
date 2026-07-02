@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
@@ -6,6 +7,9 @@ import { GlobalSearch } from './GlobalSearch';
 import { useUiStore } from '@/store/uiStore';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { usePermissions } from '@/hooks/usePermissions';
+import { isProdMode } from '@/config/appMode';
+import { loadCatalog } from '@/services/catalogService';
+import { toast } from '@/store/uiStore';
 import { ROUTES } from '@/constants/routes';
 
 export function AppLayout() {
@@ -17,6 +21,12 @@ export function AppLayout() {
     'ctrl+k': () => setGlobalSearchOpen(true),
     f2: () => can('sell') && navigate(ROUTES.pos),
   });
+
+  // En modo prod, trae el catálogo del backend al entrar (en demo ya está sembrado).
+  useEffect(() => {
+    if (!isProdMode) return;
+    loadCatalog().catch(() => toast.error('No se pudo cargar el catálogo', 'Revisá tu conexión con el servidor.'));
+  }, []);
 
   return (
     <div className="flex min-h-dvh">

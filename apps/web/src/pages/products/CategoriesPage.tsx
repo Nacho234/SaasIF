@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Pencil, Plus, Power, Tags } from 'lucide-react';
 import { useProductStore } from '@/store/productStore';
-import { logAudit } from '@/services/auditService';
+import { createCategory, updateCategory } from '@/services/catalogService';
+import { ApiError } from '@/services/api/apiClient';
 import { toast, useUiStore } from '@/store/uiStore';
-import { generateId } from '@/utils/id';
 import { ROUTES } from '@/constants/routes';
 import type { Category } from '@/types';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -20,8 +20,6 @@ const COLOR_CHOICES = ['#f59e0b', '#8b5cf6', '#ec4899', '#22c55e', '#06b6d4', '#
 export function CategoriesPage() {
   const categories = useProductStore((s) => s.categories);
   const products = useProductStore((s) => s.products);
-  const addCategory = useProductStore((s) => s.addCategory);
-  const updateCategory = useProductStore((s) => s.updateCategory);
   const askConfirm = useUiStore((s) => s.askConfirm);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -40,20 +38,23 @@ export function CategoriesPage() {
     setModalOpen(true);
   };
 
-  const submit = () => {
+  const submit = async () => {
     if (!name.trim()) {
       setError('El nombre es obligatorio.');
       return;
     }
-    if (editing) {
-      updateCategory(editing.id, { name: name.trim(), description, color });
-      toast.success('Categoría actualizada');
-    } else {
-      addCategory({ id: generateId(), name: name.trim(), description, color, isActive: true });
-      logAudit({ action: 'category_created', module: 'products', description: `Creó la categoría "${name.trim()}"` });
-      toast.success('Categoría creada');
+    try {
+      if (editing) {
+        await updateCategory(editing.id, { name: name.trim(), description, color });
+        toast.success('Categoría actualizada');
+      } else {
+        await createCategory({ name: name.trim(), description, color });
+        toast.success('Categoría creada');
+      }
+      setModalOpen(false);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo guardar la categoría.');
     }
-    setModalOpen(false);
   };
 
   const toggle = (category: Category) => {
@@ -65,8 +66,9 @@ export function CategoriesPage() {
       danger: category.isActive,
       confirmLabel: category.isActive ? 'Desactivar' : 'Reactivar',
       onConfirm: () => {
-        updateCategory(category.id, { isActive: !category.isActive });
-        toast.success(category.isActive ? 'Categoría desactivada' : 'Categoría reactivada');
+        void updateCategory(category.id, { isActive: !category.isActive })
+          .then(() => toast.success(category.isActive ? 'Categoría desactivada' : 'Categoría reactivada'))
+          .catch(() => toast.error('No se pudo actualizar la categoría.'));
       },
     });
   };
