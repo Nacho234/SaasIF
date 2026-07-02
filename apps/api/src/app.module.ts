@@ -6,6 +6,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { BusinessModule } from './modules/business/business.module';
+import { CustomersModule } from './modules/customers/customers.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { PermissionGuard } from './modules/auth/guards/permission.guard';
 import { validateEnv } from './config/env.validation';
@@ -18,6 +19,7 @@ import { validateEnv } from './config/env.validation';
     HealthModule,
     CatalogModule,
     BusinessModule,
+    CustomersModule,
   ],
   providers: [
     // Orden: autenticación primero (setea req.user), permisos después.

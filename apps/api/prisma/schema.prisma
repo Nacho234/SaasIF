@@ -60,6 +60,7 @@ model Business {
   categories    Category[]
   brands        Brand[]
   products      Product[]
+  customers     Customer[]
 
   @@map("businesses")
 }
@@ -215,4 +216,28 @@ model Product {
   @@index([businessId])
   @@index([businessId, categoryId])
   @@map("products")
+}
+
+model Customer {
+  id          String    @id @default(cuid())
+  businessId  String
+  name        String
+  phone       String    @default("")
+  email       String    @default("")
+  document    String    @default("")
+  cuit        String    @default("")
+  address     String    @default("")
+  birthDate   DateTime?
+  notes       String    @default("")
+  tags        String[]  @default([])
+  isActive    Boolean   @default(true)
+  // Deuda de cuenta corriente (>= 0). La gestiona el dominio Ventas/Cuenta corriente; acá es cache.
+  debtBalance Decimal   @default(0) @db.Decimal(14, 2)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@map("customers")
 }
