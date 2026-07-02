@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Save, Store, Wrench } from 'lucide-react';
+import { Save, Store, Trash2, Wrench } from 'lucide-react';
 import { useBusinessStore } from '@/store/businessStore';
+import { usePermissions } from '@/hooks/usePermissions';
+import { DeleteBusinessModal } from './DeleteBusinessModal';
 import { logAudit } from '@/services/auditService';
 import { toast } from '@/store/uiStore';
 import { BUSINESS_CATEGORIES, PRESET_COLORS } from '@/constants/demo';
@@ -28,8 +30,10 @@ const TABS = [
 export function SettingsPage() {
   const settings = useBusinessStore((s) => s.settings);
   const updateSettings = useBusinessStore((s) => s.updateSettings);
+  const { can } = usePermissions();
   const [tab, setTab] = useState('general');
   const [draft, setDraft] = useState<BusinessSettings>({ ...settings });
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const set = (patch: Partial<BusinessSettings>) => setDraft((d) => ({ ...d, ...patch }));
 
@@ -277,6 +281,27 @@ export function SettingsPage() {
           Guardar cambios
         </Button>
       </div>
+
+      {/* Zona peligrosa — solo admin */}
+      {can('manage_settings') && (
+        <Card className="mt-8 border-red-200 dark:border-red-900">
+          <CardHeader
+            title={<span className="text-red-600 dark:text-red-400">Zona peligrosa</span>}
+            subtitle="Eliminar el negocio borra todos sus datos y no se puede deshacer"
+          />
+          <CardBody className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Se eliminan productos, clientes, ventas, caja, usuarios y configuración.
+            </p>
+            <Button variant="danger" onClick={() => setDeleteOpen(true)}>
+              <Trash2 className="size-4" aria-hidden />
+              Eliminar negocio
+            </Button>
+          </CardBody>
+        </Card>
+      )}
+
+      <DeleteBusinessModal open={deleteOpen} onClose={() => setDeleteOpen(false)} />
     </div>
   );
 }
