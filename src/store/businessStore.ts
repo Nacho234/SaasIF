@@ -21,6 +21,17 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   allowSellerOpenCash: false,
   allowSellerCloseCash: false,
   requireNoteOnCashDifference: true,
+  requireCashCount: true,
+  allowCloseWithDifference: true,
+  requireTerminalClosure: false,
+  terminalClosureMode: 'simple',
+  requireEmployeeSignature: false,
+  requireManagerSignature: false,
+  allowReopenCash: true,
+  reopenOnlyAdmin: true,
+  autoGeneratePdf: true,
+  showFiscalSummary: true,
+  showStockSummary: true,
   allowNegativeStock: false,
   allowDiscounts: true,
   maxDiscountPercent: 20,
@@ -54,6 +65,18 @@ export const useBusinessStore = create<BusinessState>()(
       completeOnboarding: () => set({ onboardingCompleted: true }),
       setDemoSeeded: (seeded) => set({ demoSeeded: seeded }),
     }),
-    { name: storageKey('business') },
+    {
+      name: storageKey('business'),
+      // Completa con los defaults las claves nuevas que no estén en el estado persistido
+      // (p. ej. flags de cierre agregados en una versión posterior).
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<BusinessState>;
+        return {
+          ...current,
+          ...p,
+          settings: { ...DEFAULT_SETTINGS, ...(p.settings ?? {}) },
+        };
+      },
+    },
   ),
 );

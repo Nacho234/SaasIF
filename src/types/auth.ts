@@ -4,6 +4,7 @@ export type Permission =
   | 'sell'
   | 'open_cash'
   | 'close_cash'
+  | 'reopen_cash'
   | 'register_expenses'
   | 'create_discount'
   | 'cancel_sale'
