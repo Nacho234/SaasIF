@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Bookmark, Pencil, Plus, Power } from 'lucide-react';
 import { useProductStore } from '@/store/productStore';
-import { logAudit } from '@/services/auditService';
+import { createBrand, updateBrand } from '@/services/catalogService';
+import { ApiError } from '@/services/api/apiClient';
 import { toast, useUiStore } from '@/store/uiStore';
-import { generateId } from '@/utils/id';
 import type { Brand } from '@/types';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
@@ -17,8 +17,6 @@ import { EmptyState } from '@/components/ui/EmptyState';
 export function BrandsPage() {
   const brands = useProductStore((s) => s.brands);
   const products = useProductStore((s) => s.products);
-  const addBrand = useProductStore((s) => s.addBrand);
-  const updateBrand = useProductStore((s) => s.updateBrand);
   const askConfirm = useUiStore((s) => s.askConfirm);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -35,20 +33,23 @@ export function BrandsPage() {
     setModalOpen(true);
   };
 
-  const submit = () => {
+  const submit = async () => {
     if (!name.trim()) {
       setError('El nombre es obligatorio.');
       return;
     }
-    if (editing) {
-      updateBrand(editing.id, { name: name.trim(), description });
-      toast.success('Marca actualizada');
-    } else {
-      addBrand({ id: generateId(), name: name.trim(), description, isActive: true });
-      logAudit({ action: 'brand_created', module: 'products', description: `Creó la marca "${name.trim()}"` });
-      toast.success('Marca creada');
+    try {
+      if (editing) {
+        await updateBrand(editing.id, { name: name.trim(), description });
+        toast.success('Marca actualizada');
+      } else {
+        await createBrand({ name: name.trim(), description });
+        toast.success('Marca creada');
+      }
+      setModalOpen(false);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo guardar la marca.');
     }
-    setModalOpen(false);
   };
 
   const toggle = (brand: Brand) => {
@@ -58,8 +59,9 @@ export function BrandsPage() {
       danger: brand.isActive,
       confirmLabel: brand.isActive ? 'Desactivar' : 'Reactivar',
       onConfirm: () => {
-        updateBrand(brand.id, { isActive: !brand.isActive });
-        toast.success(brand.isActive ? 'Marca desactivada' : 'Marca reactivada');
+        void updateBrand(brand.id, { isActive: !brand.isActive })
+          .then(() => toast.success(brand.isActive ? 'Marca desactivada' : 'Marca reactivada'))
+          .catch(() => toast.error('No se pudo actualizar la marca.'));
       },
     });
   };

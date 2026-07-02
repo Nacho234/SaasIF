@@ -4,13 +4,12 @@ import { Save } from 'lucide-react';
 import { useProductStore } from '@/store/productStore';
 import { useSupplierStore } from '@/store/supplierStore';
 import { useBusinessStore } from '@/store/businessStore';
-import { logAudit } from '@/services/auditService';
+import { createProduct, updateProduct } from '@/services/catalogService';
+import { ApiError } from '@/services/api/apiClient';
 import { toast } from '@/store/uiStore';
-import { generateId } from '@/utils/id';
 import { calcMarginPercent } from '@/utils/calc';
 import { formatPercent } from '@/utils/format';
 import { ROUTES } from '@/constants/routes';
-import type { Product } from '@/types';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -46,8 +45,6 @@ export function ProductFormPage() {
   const categories = allCategories.filter((c) => c.isActive);
   const brands = allBrands.filter((b) => b.isActive);
   const suppliers = allSuppliers.filter((x) => x.isActive);
-  const addProduct = useProductStore((s) => s.addProduct);
-  const updateProduct = useProductStore((s) => s.updateProduct);
   const defaultMinStock = useBusinessStore((s) => s.settings.defaultMinStock);
 
   const editing = id ? products.find((p) => p.id === id) : undefined;
@@ -69,6 +66,7 @@ export function ProductFormPage() {
     notes: editing?.notes ?? '',
   }));
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
+  const [saving, setSaving] = useState(false);
 
   const set = (patch: Partial<FormState>) => setForm((f) => ({ ...f, ...patch }));
 
@@ -92,56 +90,53 @@ export function ProductFormPage() {
     return Object.keys(next).length === 0;
   };
 
-  const submit = () => {
+  const submit = async () => {
     if (!validate()) {
       toast.error('Revisá los campos marcados en rojo.');
       return;
     }
-    const now = new Date().toISOString();
-    if (editing) {
-      updateProduct(editing.id, {
-        name: form.name.trim(),
-        sku: form.sku.trim(),
-        barcode: form.barcode.trim(),
-        categoryId: form.categoryId,
-        brandId: form.brandId || null,
-        supplierId: form.supplierId || null,
-        description: form.description,
-        costPrice: cost,
-        salePrice: price,
-        minStock: Number(form.minStock),
-        isActive: form.isActive,
-        isFavorite: form.isFavorite,
-        notes: form.notes,
-      });
-      logAudit({ action: 'product_updated', module: 'products', description: `Editó el producto "${form.name.trim()}"` });
-      toast.success('Producto actualizado');
-      navigate(ROUTES.productDetail(editing.id));
-    } else {
-      const product: Product = {
-        id: generateId(),
-        sku: form.sku.trim(),
-        barcode: form.barcode.trim(),
-        name: form.name.trim(),
-        description: form.description,
-        categoryId: form.categoryId,
-        brandId: form.brandId || null,
-        supplierId: form.supplierId || null,
-        costPrice: cost,
-        salePrice: price,
-        stock: Number(form.stock),
-        minStock: Number(form.minStock),
-        image: null,
-        isActive: form.isActive,
-        isFavorite: form.isFavorite,
-        notes: form.notes,
-        createdAt: now,
-        updatedAt: now,
-      };
-      addProduct(product);
-      logAudit({ action: 'product_created', module: 'products', description: `Creó el producto "${product.name}"`, severity: 'success' });
-      toast.success('Producto creado', product.name);
-      navigate(ROUTES.productDetail(product.id));
+    setSaving(true);
+    try {
+      if (editing) {
+        await updateProduct(editing.id, {
+          name: form.name.trim(),
+          sku: form.sku.trim(),
+          barcode: form.barcode.trim(),
+          categoryId: form.categoryId,
+          brandId: form.brandId || null,
+          supplierId: form.supplierId || null,
+          description: form.description,
+          costPrice: cost,
+          salePrice: price,
+          minStock: Number(form.minStock),
+          isActive: form.isActive,
+          isFavorite: form.isFavorite,
+          notes: form.notes,
+        });
+        toast.success('Producto actualizado');
+        navigate(ROUTES.productDetail(editing.id));
+      } else {
+        const product = await createProduct({
+          name: form.name.trim(),
+          sku: form.sku.trim(),
+          barcode: form.barcode.trim(),
+          description: form.description,
+          categoryId: form.categoryId,
+          brandId: form.brandId || null,
+          supplierId: form.supplierId || null,
+          costPrice: cost,
+          salePrice: price,
+          stock: Number(form.stock),
+          minStock: Number(form.minStock),
+          isFavorite: form.isFavorite,
+          notes: form.notes,
+        });
+        toast.success('Producto creado', product.name);
+        navigate(ROUTES.productDetail(product.id));
+      }
+    } catch (err) {
+      toast.error('No se pudo guardar el producto', err instanceof ApiError ? err.message : undefined);
+      setSaving(false);
     }
   };
 
@@ -151,7 +146,7 @@ export function ProductFormPage() {
         title={editing ? `Editar: ${editing.name}` : 'Nuevo producto'}
         backTo={editing ? ROUTES.productDetail(editing.id) : ROUTES.products}
         actions={
-          <Button onClick={submit}>
+          <Button onClick={submit} loading={saving}>
             <Save className="size-4" aria-hidden />
             {editing ? 'Guardar cambios' : 'Crear producto'}
           </Button>
@@ -209,7 +204,7 @@ export function ProductFormPage() {
 
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={() => navigate(-1)}>Cancelar</Button>
-          <Button onClick={submit}>
+          <Button onClick={submit} loading={saving}>
             <Save className="size-4" aria-hidden />
             {editing ? 'Guardar cambios' : 'Crear producto'}
           </Button>

@@ -5,8 +5,8 @@ import { useProductStore } from '@/store/productStore';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useDebounce } from '@/hooks/useDebounce';
 import { toast, useUiStore } from '@/store/uiStore';
-import { logAudit } from '@/services/auditService';
-import { generateId } from '@/utils/id';
+import { createProduct, updateProduct } from '@/services/catalogService';
+import { ApiError } from '@/services/api/apiClient';
 import { formatCurrency } from '@/utils/format';
 import { calcMarginPercent } from '@/utils/calc';
 import { ROUTES } from '@/constants/routes';
@@ -34,8 +34,6 @@ export function ProductsPage() {
   const products = useProductStore((s) => s.products);
   const categories = useProductStore((s) => s.categories);
   const brands = useProductStore((s) => s.brands);
-  const addProduct = useProductStore((s) => s.addProduct);
-  const updateProduct = useProductStore((s) => s.updateProduct);
 
   const [query, setQuery] = useState('');
   const debounced = useDebounce(query);
@@ -67,19 +65,28 @@ export function ProductsPage() {
     return list;
   }, [products, debounced, categoryFilter, brandFilter, stockFilter, statusFilter, sortKey]);
 
-  const duplicate = (product: Product) => {
-    const copy: Product = {
-      ...product,
-      id: generateId(),
-      sku: `${product.sku}-COPIA`,
-      name: `${product.name} (copia)`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    addProduct(copy);
-    logAudit({ action: 'product_created', module: 'products', description: `Duplicó el producto "${product.name}"` });
-    toast.success('Producto duplicado', 'Revisá el SKU y los datos de la copia.');
-    navigate(ROUTES.productEdit(copy.id));
+  const duplicate = async (product: Product) => {
+    try {
+      const copy = await createProduct({
+        name: `${product.name} (copia)`,
+        sku: `${product.sku}-COPIA`,
+        barcode: product.barcode,
+        description: product.description,
+        categoryId: product.categoryId,
+        brandId: product.brandId,
+        supplierId: product.supplierId,
+        costPrice: product.costPrice,
+        salePrice: product.salePrice,
+        stock: product.stock,
+        minStock: product.minStock,
+        isFavorite: product.isFavorite,
+        notes: product.notes,
+      });
+      toast.success('Producto duplicado', 'Revisá el SKU y los datos de la copia.');
+      navigate(ROUTES.productEdit(copy.id));
+    } catch (err) {
+      toast.error('No se pudo duplicar', err instanceof ApiError ? err.message : undefined);
+    }
   };
 
   const toggleActive = (product: Product) => {
@@ -91,14 +98,9 @@ export function ProductsPage() {
       confirmLabel: product.isActive ? 'Desactivar' : 'Reactivar',
       danger: product.isActive,
       onConfirm: () => {
-        updateProduct(product.id, { isActive: !product.isActive });
-        logAudit({
-          action: product.isActive ? 'product_deactivated' : 'product_activated',
-          module: 'products',
-          description: `${product.isActive ? 'Desactivó' : 'Reactivó'} el producto "${product.name}"`,
-          severity: 'warning',
-        });
-        toast.success(product.isActive ? 'Producto desactivado' : 'Producto reactivado');
+        void updateProduct(product.id, { isActive: !product.isActive })
+          .then(() => toast.success(product.isActive ? 'Producto desactivado' : 'Producto reactivado'))
+          .catch(() => toast.error('No se pudo actualizar el producto.'));
       },
     });
   };
@@ -165,7 +167,7 @@ export function ProductsPage() {
                     {
                       label: p.isFavorite ? 'Quitar de favoritos' : 'Marcar favorito',
                       icon: <Star className="size-4" />,
-                      onClick: () => updateProduct(p.id, { isFavorite: !p.isFavorite }),
+                      onClick: () => void updateProduct(p.id, { isFavorite: !p.isFavorite }),
                     },
                   ]
                 : []),
