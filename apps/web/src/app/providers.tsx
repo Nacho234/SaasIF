@@ -6,16 +6,13 @@ import { seedDemoData } from '@/demo/demoDataService';
 import { applyDensity, applyPrimaryColor, applyThemeMode } from '@/utils/theme';
 import { ToastHost } from '@/components/ui/ToastHost';
 import { ConfirmDialogHost } from '@/components/ui/ConfirmDialogHost';
-import { toast } from '@/store/uiStore';
 
 function PwaUpdater() {
+  // Registra el service worker (la app sigue funcionando offline) pero sin
+  // mostrar avisos al usuario: ni "listo para usar offline" ni errores de registro.
   useRegisterSW({
-    onOfflineReady() {
-      toast.info('App lista para usar offline', 'Mostrador quedó instalada en caché local.');
-    },
-    onRegisterError() {
-      // Silencioso: la demo funciona igual sin service worker.
-    },
+    onOfflineReady() {},
+    onRegisterError() {},
   });
   return null;
 }
