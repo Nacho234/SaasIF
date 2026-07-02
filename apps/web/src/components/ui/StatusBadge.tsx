@@ -1,5 +1,5 @@
 import type { CashRegisterStatus, PurchaseStatus, SaleStatus } from '@/types';
-import { CASH_MOVEMENT_LABELS, PURCHASE_STATUS_LABELS, SALE_STATUS_LABELS } from '@/constants/labels';
+import { CASH_MOVEMENT_LABELS, CASH_STATUS_LABELS, PURCHASE_STATUS_LABELS, SALE_STATUS_LABELS } from '@/constants/labels';
 import type { CashMovementType } from '@/types';
 import { Badge } from './Badge';
 
@@ -22,9 +22,21 @@ export function PurchaseStatusBadge({ status }: { status: PurchaseStatus }) {
 }
 
 export function CashStatusBadge({ status }: { status: CashRegisterStatus }) {
-  if (status === 'open') return <Badge variant="success" dot>Abierta</Badge>;
-  if (status === 'closed') return <Badge variant="default">Cerrada</Badge>;
-  return <Badge variant="warning">Cerrada con diferencia</Badge>;
+  const variant = (
+    {
+      open: 'success',
+      closed: 'default',
+      closed_with_difference: 'warning',
+      reopened: 'info',
+      cancelled: 'danger',
+    } as const
+  )[status];
+  const dot = status === 'open' || status === 'reopened';
+  return (
+    <Badge variant={variant} dot={dot}>
+      {CASH_STATUS_LABELS[status]}
+    </Badge>
+  );
 }
 
 export function CashMovementBadge({ type }: { type: CashMovementType }) {

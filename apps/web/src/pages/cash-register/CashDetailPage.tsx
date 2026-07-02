@@ -1,30 +1,39 @@
-import { useMemo } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { Banknote, Receipt, Wallet } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Banknote, FileText, Receipt, Unlock, Wallet } from 'lucide-react';
 import { useCashStore } from '@/store/cashStore';
 import { useSalesStore } from '@/store/salesStore';
+import { useBusinessStore } from '@/store/businessStore';
 import { getRegisterSummary } from '@/services/cashRegisterService';
+import { getLatestClosure } from '@/services/cashClosureService';
+import { usePermissions } from '@/hooks/usePermissions';
 import { formatCurrency, formatFriendlyDateTime, formatMoney } from '@/utils/format';
 import { ROUTES } from '@/constants/routes';
 import { PAYMENT_METHOD_LABELS } from '@/constants/paymentMethods';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { StatCard } from '@/components/ui/StatCard';
+import { Button } from '@/components/ui/Button';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { CashMovementBadge, CashStatusBadge, SaleStatusBadge } from '@/components/ui/StatusBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ReopenCashModal } from '@/components/cash/ReopenCashModal';
 import type { CashMovement, Sale } from '@/types';
 import { cn } from '@/utils/cn';
 
 export function CashDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { can } = usePermissions();
   const register = useCashStore((s) => s.registers.find((r) => r.id === id));
   const movements = useCashStore((s) => s.movements);
   const allSales = useSalesStore((s) => s.sales);
   const sales = useMemo(() => allSales.filter((x) => x.cashRegisterId === id), [allSales, id]);
+  const allowReopen = useBusinessStore((s) => s.settings.allowReopenCash);
+  const [reopenModal, setReopenModal] = useState(false);
 
   const summary = useMemo(() => (register ? getRegisterSummary(register.id) : null), [register, movements]);
+  const closure = register ? getLatestClosure(register.id) : undefined;
 
   if (!register || !summary) {
     return (
@@ -69,7 +78,25 @@ export function CashDetailPage() {
         title={`Caja ${register.number}`}
         subtitle={`Abierta ${formatFriendlyDateTime(register.openedAt)} por ${register.openedByName}${register.closedAt ? ` · cerrada ${formatFriendlyDateTime(register.closedAt)} por ${register.closedByName}` : ''}`}
         backTo={ROUTES.cashHistory}
-        actions={<CashStatusBadge status={register.status} />}
+        actions={
+          <>
+            {closure && (
+              <Link to={ROUTES.cashClosure(register.id)}>
+                <Button variant="secondary">
+                  <FileText className="size-4" aria-hidden />
+                  Hoja de cierre
+                </Button>
+              </Link>
+            )}
+            {allowReopen && can('reopen_cash') && (register.status === 'closed' || register.status === 'closed_with_difference') && (
+              <Button variant="outline-danger" onClick={() => setReopenModal(true)}>
+                <Unlock className="size-4" aria-hidden />
+                Reabrir
+              </Button>
+            )}
+            <CashStatusBadge status={register.status} />
+          </>
+        }
       />
 
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -153,6 +180,8 @@ export function CashDetailPage() {
           emptyState={<EmptyState icon={Wallet} title="Sin movimientos" />}
         />
       </Card>
+
+      <ReopenCashModal open={reopenModal} onClose={() => setReopenModal(false)} register={register} />
     </div>
   );
 }

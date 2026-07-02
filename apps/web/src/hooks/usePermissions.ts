@@ -13,6 +13,9 @@ export function usePermissions() {
 
   const can = (permission: Permission): boolean => {
     if (!user) return false;
+    // El administrador tiene control total (equivale a ALL_PERMISSIONS);
+    // esto cubre además permisos agregados en versiones posteriores.
+    if (user.role === 'admin') return true;
     if (user.role === 'seller') {
       if (permission === 'open_cash') return settings.allowSellerOpenCash || user.permissions.includes('open_cash');
       if (permission === 'close_cash') return settings.allowSellerCloseCash || user.permissions.includes('close_cash');

@@ -9,8 +9,10 @@ import { DashboardPage } from '@/pages/dashboard/DashboardPage';
 import { POSPage } from '@/pages/pos/POSPage';
 import { ReceiptPage } from '@/pages/pos/ReceiptPage';
 import { CashRegisterPage } from '@/pages/cash-register/CashRegisterPage';
+import { CloseCashPage } from '@/pages/cash-register/CloseCashPage';
 import { CashHistoryPage } from '@/pages/cash-register/CashHistoryPage';
 import { CashDetailPage } from '@/pages/cash-register/CashDetailPage';
+import { CashClosureReportPage } from '@/pages/cash-register/CashClosureReportPage';
 import { ProductsPage } from '@/pages/products/ProductsPage';
 import { ProductFormPage } from '@/pages/products/ProductFormPage';
 import { ProductDetailPage } from '@/pages/products/ProductDetailPage';
@@ -69,7 +71,16 @@ export const router = createBrowserRouter([
       },
       { path: ROUTES.receipt(), element: <ReceiptPage /> },
       { path: ROUTES.cash, element: <CashRegisterPage /> },
+      {
+        path: ROUTES.closeCash,
+        element: (
+          <RequirePermission permission="close_cash">
+            <CloseCashPage />
+          </RequirePermission>
+        ),
+      },
       { path: ROUTES.cashHistory, element: <CashHistoryPage /> },
+      { path: ROUTES.cashClosure(), element: <CashClosureReportPage /> },
       { path: ROUTES.cashDetail(), element: <CashDetailPage /> },
       { path: ROUTES.products, element: <ProductsPage /> },
       {

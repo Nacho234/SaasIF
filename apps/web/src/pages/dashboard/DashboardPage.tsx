@@ -36,7 +36,6 @@ import { Badge } from '@/components/ui/Badge';
 import { SaleStatusBadge, CashMovementBadge } from '@/components/ui/StatusBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { OpenCashModal } from '@/components/cash/OpenCashModal';
-import { CloseCashModal } from '@/components/cash/CloseCashModal';
 import { SimpleBarChart } from '@/components/charts/SimpleBarChart';
 import { cn } from '@/utils/cn';
 
@@ -63,7 +62,6 @@ export function DashboardPage() {
   const invMovements = useInventoryStore((s) => s.movements);
 
   const [openCashModal, setOpenCashModal] = useState(false);
-  const [closeCashModal, setCloseCashModal] = useState(false);
 
   const metrics = useMemo(() => getSalesMetrics(rangeFromPreset('today')), [sales]);
 
@@ -103,7 +101,7 @@ export function DashboardPage() {
                 </Button>
               )}
               {can('close_cash') && (
-                <Button variant="secondary" onClick={() => setCloseCashModal(true)}>
+                <Button variant="secondary" onClick={() => navigate(ROUTES.closeCash)}>
                   <Lock className="size-4" aria-hidden />
                   Cerrar caja
                 </Button>
@@ -401,9 +399,6 @@ export function DashboardPage() {
       </Card>
 
       <OpenCashModal open={openCashModal} onClose={() => setOpenCashModal(false)} />
-      {openRegister && (
-        <CloseCashModal open={closeCashModal} onClose={() => setCloseCashModal(false)} register={openRegister} />
-      )}
     </div>
   );
 }

@@ -10,6 +10,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   sell: 'Vender',
   open_cash: 'Abrir caja',
   close_cash: 'Cerrar caja',
+  reopen_cash: 'Reabrir caja',
   register_expenses: 'Registrar gastos',
   create_discount: 'Aplicar descuentos',
   cancel_sale: 'Anular ventas',
