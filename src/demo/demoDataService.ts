@@ -17,10 +17,10 @@ import type {
   SaleReturn,
   User,
 } from '@/types';
-import { MOCK_USERS } from '@/mocks/mockUsers';
-import { MOCK_BRANDS, MOCK_CATEGORIES, MOCK_COMBOS, MOCK_PRODUCTS } from '@/mocks/mockCatalog';
-import { MOCK_CUSTOMERS } from '@/mocks/mockCustomers';
-import { MOCK_SUPPLIERS } from '@/mocks/mockSuppliers';
+import { MOCK_USERS } from './mocks/mockUsers';
+import { MOCK_BRANDS, MOCK_CATEGORIES, MOCK_COMBOS, MOCK_PRODUCTS } from './mocks/mockCatalog';
+import { MOCK_CUSTOMERS } from './mocks/mockCustomers';
+import { MOCK_SUPPLIERS } from './mocks/mockSuppliers';
 import { useUserStore } from '@/store/userStore';
 import { useProductStore } from '@/store/productStore';
 import { useCustomerStore } from '@/store/customerStore';
@@ -35,7 +35,7 @@ import { useAuditStore } from '@/store/auditStore';
 import { useBusinessStore } from '@/store/businessStore';
 import { generateCashNumber, generateId, generatePurchaseNumber, generateSaleNumber } from '@/utils/id';
 import { round2 } from '@/utils/calc';
-import { clearAllAppStorage } from './storageService';
+import { clearAllAppStorage } from '@/services/storageService';
 import { ROUTES } from '@/constants/routes';
 
 /** RNG determinístico para que la demo sea reproducible. */

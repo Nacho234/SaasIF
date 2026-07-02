@@ -7,7 +7,7 @@
 localStorage.clear();
 (globalThis as unknown as { window: unknown }).window = { location: { reload() {} }, localStorage };
 
-const { seedDemoData } = await import('../src/services/demoDataService');
+const { seedDemoData } = await import('../src/demo/demoDataService');
 const { useProductStore } = await import('../src/store/productStore');
 const { useInventoryStore } = await import('../src/store/inventoryStore');
 const { useCashStore } = await import('../src/store/cashStore');

@@ -4,7 +4,7 @@ import { useProductStore } from '@/store/productStore';
 import { useSalesStore } from '@/store/salesStore';
 import { useCustomerStore } from '@/store/customerStore';
 import { useAuditStore } from '@/store/auditStore';
-import { resetDemoData } from '@/services/demoDataService';
+import { resetDemoData } from '@/demo/demoDataService';
 import { appStorageSizeKb, exportAllData, importAllData, listAppKeys } from '@/services/storageService';
 import { logAudit } from '@/services/auditService';
 import { toast, useUiStore } from '@/store/uiStore';
