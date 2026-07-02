@@ -1,5 +1,6 @@
 import { useAuthStore } from '@/store/authStore';
 import { useUserStore } from '@/store/userStore';
+import { isDemoMode } from '@/config/appMode';
 import { logAudit } from './auditService';
 
 export function login(userId: string): { ok: boolean; error?: string } {
@@ -22,8 +23,9 @@ export function login(userId: string): { ok: boolean; error?: string } {
 
 export function logout(): void {
   const user = useAuthStore.getState().user;
-  if (user) {
+  if (user && isDemoMode) {
     logAudit({ action: 'logout', module: 'auth', description: `${user.name} cerró sesión` });
   }
-  useAuthStore.getState().setUser(null);
+  // clearSession limpia user + token + businessId (sirve para demo y prod).
+  useAuthStore.getState().clearSession();
 }
