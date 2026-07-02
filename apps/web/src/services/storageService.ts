@@ -1,7 +1,13 @@
 import { STORAGE_PREFIX } from '@/constants/demo';
+import { APP_MODE } from '@/config/appMode';
 
+/**
+ * Las claves incluyen el modo (demo | prod) para que los datos NO se crucen:
+ * demo tiene su escenario cargado; prod arranca vacío (los datos reales vienen del backend).
+ * Así, un negocio recién registrado en prod no ve datos de demostración.
+ */
 export function storageKey(name: string): string {
-  return `${STORAGE_PREFIX}:${name}`;
+  return `${STORAGE_PREFIX}:${APP_MODE}:${name}`;
 }
 
 export function listAppKeys(): string[] {
