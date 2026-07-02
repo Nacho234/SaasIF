@@ -86,7 +86,75 @@ registrar todos los intentos (ver estándar de producción, sección ARCA).
 - **MVP conciliación (más adelante)**: procesadores, terminales, marcas, cuotas, lotes, comisiones,
   acreditaciones, reportes por procesador — todo en `pagos-avanzados.md`.
 
+## Errores de CAE, reintentos y reimpresión (deep-dive operativo)
+
+El problema central: la venta puede registrarse OK (pago, stock, caja) pero **fallar el CAE**
+(internet caído, timeout, ARCA caído, certificado/token vencido, punto de venta mal configurado,
+CUIT inválido, tipo de comprobante incompatible, error de impresión). El sistema debe manejarlo
+**sin duplicar ventas ni comprobantes, y sin perder trazabilidad**.
+
+### Regla de oro
+**La venta se crea una sola vez.** El CAE se autoriza o se reintenta **sobre la misma venta/`fiscal_invoice`**.
+La reimpresión **nunca** crea otra venta ni pide otro CAE.
+
+### Estados fiscales (versión detallada — reemplaza la lista simple de arriba)
+`not_required | internal_only | pending_cae | requesting_cae | cae_authorized | cae_error |
+retry_pending | retrying | cancelled_fiscally`. Van **separados** del estado de venta
+(`created | paid | cancelled | returned`): una venta puede estar `paid` con fiscal `cae_error`.
+
+### Los 4 casos a resolver
+1. **Sin internet antes de pedir CAE** → venta `paid`, fiscal `pending_cae`/`cae_error`; se imprime
+   **ticket interno pendiente** ("no válido como factura"); se reintenta cuando vuelve internet.
+2. **ARCA rechaza por datos** (CUIT/condición/punto de venta/tipo) → `cae_error` con la causa visible;
+   el usuario **corrige los datos fiscales** y reintenta sobre la misma venta.
+3. **Timeout (el caso delicado)** → NO pedir un CAE nuevo a ciegas. Antes de reintentar, **consultar
+   a ARCA el último comprobante autorizado** (CUIT + punto de venta + tipo); si coincide con la venta
+   pendiente, guardar ese CAE y marcar autorizado; si no, reintentar. Evita CAE duplicado y saltos de numeración.
+4. **CAE autorizado pero no imprimió** → fiscal queda `cae_authorized`; acción = **reimprimir** el mismo
+   comprobante. NO pedir CAE de nuevo, NO crear venta.
+
+### Reglas de reintento y reimpresión (no negociables)
+- Reintentar CAE: opera sobre la misma venta; **no** toca stock ni caja; **no** crea venta; **no** se
+  permite si ya hay `cae_authorized`; cada intento se registra; timeout → verificar antes de reintentar.
+- Reimprimir: nunca crea venta, nunca mueve stock/caja, nunca pide CAE nuevo. Con CAE → mismo comprobante
+  fiscal; sin CAE → ticket interno pendiente. Se registra en `print_logs`/auditoría. Ticket reimpreso lleva
+  leyenda "REIMPRESIÓN" + fecha original.
+- **Errores reintentables** (internet/timeout/ARCA caído/token vencido) → cola de reintentos.
+  **No reintentables sin corregir** (CUIT/punto de venta/tipo/condición/importe) → mostrar qué dato arreglar.
+
+### Modo de emisión (configurable en Ajustes → Facturación)
+- **Seguro**: la venta fiscal no se finaliza hasta obtener CAE (estricto; si ARCA/internet falla, frena).
+- **Operativo con pendientes** (default práctico): la venta queda `paid`, fiscal `pending_cae`, imprime
+  ticket interno, y se reintenta después. No frena el local, pero exige control de pendientes.
+
+### Tablas adicionales (fase Fiscal) — multi-tenant por `businessId`
+- **arca_attempts**: `sale_id`, `fiscal_invoice_id`, `attempt_number`, `status`, `request_payload`,
+  `response_payload`, `error_code`, `error_message`, `started_at`, `finished_at` (cada intento ARCA).
+- **fiscal_retry_queue** (opcional): `sale_id`, `fiscal_invoice_id`, `status` (queued/processing/success/
+  failed/cancelled), `retry_after`, `attempts_count`, `last_error`.
+- **print_logs** (opcional): `sale_id`, `fiscal_invoice_id`, `printed_by_user_id`, `print_type`
+  (internal_ticket/fiscal_invoice/reprint/cash_closure), `status`, `printer_name`, `error_message`.
+- `fiscal_invoices` suma: `retry_count`, `last_retry_at`, `authorized_at`.
+
+### Módulo "Facturación" (UI, fase Fiscal)
+Secciones: **Comprobantes autorizados** (CAE, número, vencimiento, reimprimir/PDF), **Pendientes de CAE**
+(reintentar / ticket interno), **Errores de CAE** (código, mensaje, corregir datos, reintentar),
+**Reintentos**, **Configuración ARCA**. En el **detalle de venta**: panel fiscal con estado + CAE +
+vencimiento + tipo + punto de venta + número + último error + intentos, y acciones según estado.
+
+### Impacto en el cierre de caja (integra con `cashClosure`)
+Si el negocio usa ARCA, la hoja de cierre muestra resumen fiscal: autorizadas / pendientes / con error /
+total fiscal autorizado / total interno pendiente. Config: permitir cerrar con pendientes (default, con
+**advertencia** y registro) o exigir autorización fiscal completa antes de cerrar.
+
+### Endpoints (fase Fiscal)
+`GET /api/fiscal/invoices` (+ `/pending`, `/errors`, `/:id`), `POST /api/fiscal/invoices/:id/retry`,
+`GET /api/fiscal/invoices/:id/pdf`, `POST /api/fiscal/invoices/:id/reprint`,
+`GET /api/sales/:id/fiscal-status`, `POST /api/sales/:id/retry-cae`,
+`POST /api/sales/:id/print-internal-ticket`, `POST /api/sales/:id/reprint`.
+
 ## Dependencias
 
-Requiere el dominio **Ventas** construido (`sales` para `sale_id`). Orden: Productos → Ventas/POS →
-Caja → … → **Fiscal/ARCA** → Conciliación avanzada.
+Requiere el dominio **Ventas** construido (`sales`, `fiscal_invoices`) y la integración ARCA.
+Orden: Productos → Ventas/POS → Caja → … → **Fiscal/ARCA (incluye este manejo de errores/reintentos)**
+→ Conciliación avanzada.
