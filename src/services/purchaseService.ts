@@ -3,7 +3,24 @@ import { useSupplierStore } from '@/store/supplierStore';
 import { useProductStore } from '@/store/productStore';
 import { useInventoryStore } from '@/store/inventoryStore';
 import { generateId } from '@/utils/id';
+import { round2 } from '@/utils/calc';
 import { logAudit } from './auditService';
+
+/**
+ * Costo promedio ponderado: mezcla el costo del stock existente con el de la
+ * mercadería que ingresa. Si no hay stock previo, rige el costo nuevo.
+ */
+export function weightedAverageCost(
+  previousStock: number,
+  previousCost: number,
+  incomingQuantity: number,
+  incomingCost: number,
+): number {
+  if (previousStock <= 0 || previousCost <= 0) return round2(incomingCost);
+  const totalUnits = previousStock + incomingQuantity;
+  if (totalUnits <= 0) return round2(incomingCost);
+  return round2((previousStock * previousCost + incomingQuantity * incomingCost) / totalUnits);
+}
 
 /** Marca una compra como recibida: suma stock y actualiza costos. */
 export function receivePurchase(purchaseId: string): { ok: boolean; error?: string } {
@@ -24,7 +41,8 @@ export function receivePurchase(purchaseId: string): { ok: boolean; error?: stri
     if (!product) continue;
     const previous = product.stock;
     const next = previous + item.quantity;
-    productStore.updateProduct(product.id, { stock: next, costPrice: item.unitCost });
+    const newCost = weightedAverageCost(previous, product.costPrice, item.quantity, item.unitCost);
+    productStore.updateProduct(product.id, { stock: next, costPrice: newCost });
     inventoryStore.addMovement({
       id: generateId(),
       productId: product.id,

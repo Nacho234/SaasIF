@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BarChart3, Download, Printer, Receipt, RotateCcw, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
+import { BarChart3, Download, PiggyBank, Printer, Receipt, RotateCcw, ShoppingCart, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
 import { useSalesStore } from '@/store/salesStore';
 import { useProductStore } from '@/store/productStore';
 import { useCustomerStore } from '@/store/customerStore';
@@ -52,7 +52,6 @@ export function ReportsPage() {
     return [...map.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
   }, [expenses]);
 
-  const expensesTotal = round2(expenses.reduce((acc, e) => acc + e.amount, 0));
   const cancelled = sales.filter((s) => s.status === 'cancelled').length;
   const lowStock = products.filter((p) => p.isActive && p.stock > 0 && p.stock <= p.minStock).length;
   const outStock = products.filter((p) => p.isActive && p.stock <= 0).length;
@@ -97,11 +96,19 @@ export function ReportsPage() {
       <Tabs className="mb-4" tabs={PRESETS.map((p) => ({ id: p.id, label: p.label }))} active={preset} onChange={(id) => setPreset(id as RangePreset)} />
 
       {/* Métricas principales */}
-      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-3">
         <StatCard label="Ventas totales" value={formatMoney(metrics.total)} icon={TrendingUp} tone="primary" hint={`${metrics.count} ventas`} />
         <StatCard label="Ticket promedio" value={formatMoney(metrics.avgTicket)} icon={Receipt} />
-        <StatCard label="Ganancia estimada" value={formatMoney(metrics.profit)} icon={TrendingUp} tone="success" hint={`Margen ${formatPercent(metrics.marginPercent)}`} />
-        <StatCard label="Gastos del período" value={formatMoney(expensesTotal)} icon={TrendingDown} tone="danger" />
+        <StatCard label="Ganancia bruta" value={formatMoney(metrics.profit)} icon={TrendingUp} tone="success" hint={`Margen ${formatPercent(metrics.marginPercent)}`} />
+        <StatCard label="Gastos del período" value={formatMoney(metrics.expensesTotal)} icon={TrendingDown} tone="danger" />
+        <StatCard
+          label="Ganancia neta"
+          value={formatMoney(metrics.netProfit)}
+          icon={PiggyBank}
+          tone={metrics.netProfit >= 0 ? 'success' : 'danger'}
+          hint="Bruta − gastos"
+        />
+        <StatCard label="Compras del período" value={formatMoney(metrics.purchasesTotal)} icon={ShoppingCart} hint="Mercadería recibida" />
       </div>
 
       {!hasData ? (
@@ -143,9 +150,15 @@ export function ReportsPage() {
             </Card>
 
             <Card>
-              <CardHeader title="Ventas por categoría" />
+              <CardHeader title="Ventas por categoría" subtitle="Con margen de ganancia" />
               <CardBody>
-                <SimpleBarChart data={metrics.byCategory.slice(0, 8).map((c) => ({ label: c.name, value: c.total }))} />
+                <SimpleBarChart
+                  data={metrics.byCategory.slice(0, 8).map((c) => ({
+                    label: c.name,
+                    value: c.total,
+                    hint: `${formatPercent(c.marginPercent)} margen`,
+                  }))}
+                />
               </CardBody>
             </Card>
 
@@ -174,6 +187,54 @@ export function ReportsPage() {
               </CardBody>
             </Card>
           </div>
+
+          {/* Rentabilidad por producto */}
+          <Card className="mt-4">
+            <CardHeader title="Rentabilidad por producto" subtitle="Ganancia y margen real según costo · ordenado por ganancia" />
+            <CardBody className="overflow-x-auto px-0">
+              <table className="w-full min-w-[640px] text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-400 dark:border-slate-800">
+                    <th className="px-4 py-2 font-semibold">Producto</th>
+                    <th className="px-4 py-2 text-right font-semibold">Unidades</th>
+                    <th className="px-4 py-2 text-right font-semibold">Facturación</th>
+                    <th className="px-4 py-2 text-right font-semibold">Costo</th>
+                    <th className="px-4 py-2 text-right font-semibold">Ganancia</th>
+                    <th className="px-4 py-2 text-right font-semibold">Margen</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...metrics.byProduct]
+                    .sort((a, b) => b.profit - a.profit)
+                    .slice(0, 12)
+                    .map((p) => (
+                      <tr key={p.productId} className="border-b border-slate-50 last:border-0 dark:border-slate-800/50">
+                        <td className="truncate px-4 py-2 font-medium">{p.name}</td>
+                        <td className="px-4 py-2 text-right tabular-nums">{p.quantity}</td>
+                        <td className="px-4 py-2 text-right tabular-nums">{formatMoney(p.total)}</td>
+                        <td className="px-4 py-2 text-right text-slate-500 tabular-nums">{formatMoney(p.cost)}</td>
+                        <td className={`px-4 py-2 text-right font-bold tabular-nums ${p.profit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                          {formatMoney(p.profit)}
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          <span
+                            className={`inline-block rounded-full px-2 py-0.5 text-xs font-bold tabular-nums ${
+                              p.marginPercent >= 30
+                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
+                                : p.marginPercent >= 15
+                                  ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
+                                  : 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400'
+                            }`}
+                          >
+                            {formatPercent(p.marginPercent)}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </CardBody>
+          </Card>
 
           {/* Otros indicadores */}
           <div className="mt-4 grid gap-4 lg:grid-cols-3">

@@ -165,7 +165,13 @@ export function DashboardPage() {
       <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Ventas de hoy" value={formatMoney(metrics.total)} icon={TrendingUp} tone="primary" hint={`${metrics.count} ventas`} />
         <StatCard label="Ticket promedio" value={formatMoney(metrics.avgTicket)} icon={Receipt} />
-        <StatCard label="Ganancia estimada" value={formatMoney(metrics.profit)} icon={ArrowUpRight} tone="success" hint={`${metrics.marginPercent}% margen`} />
+        <StatCard
+          label="Ganancia neta de hoy"
+          value={formatMoney(metrics.netProfit)}
+          icon={ArrowUpRight}
+          tone={metrics.netProfit >= 0 ? 'success' : 'danger'}
+          hint={`Bruta ${formatMoney(metrics.profit)} · ${metrics.marginPercent}% margen`}
+        />
         <StatCard
           label="Estado de caja"
           value={openRegister ? 'Abierta' : 'Cerrada'}

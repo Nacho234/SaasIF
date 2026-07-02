@@ -1,9 +1,10 @@
 import { endOfDay, format, isWithinInterval, parseISO, startOfDay, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
-import type { PaymentMethodId, Sale } from '@/types';
+import type { PaymentMethodId, Purchase, Sale } from '@/types';
 import { useSalesStore } from '@/store/salesStore';
 import { useProductStore } from '@/store/productStore';
 import { useExpenseStore } from '@/store/expenseStore';
+import { useSupplierStore } from '@/store/supplierStore';
 import { round2 } from '@/utils/calc';
 
 export interface DateRange {
@@ -39,16 +40,40 @@ export function salesInRange(range: DateRange, options?: { includeCancelled?: bo
     );
 }
 
+export interface ProductProfitEntry {
+  productId: string;
+  name: string;
+  quantity: number;
+  total: number;
+  cost: number;
+  profit: number;
+  marginPercent: number;
+}
+
+export interface CategoryProfitEntry {
+  name: string;
+  total: number;
+  cost: number;
+  profit: number;
+  marginPercent: number;
+}
+
 export interface SalesMetrics {
   total: number;
   count: number;
   avgTicket: number;
   profit: number;
   marginPercent: number;
+  /** Gastos activos del período. */
+  expensesTotal: number;
+  /** Ganancia neta: bruta − gastos del período. */
+  netProfit: number;
+  /** Total de compras a proveedores recibidas en el período. */
+  purchasesTotal: number;
   byMethod: Partial<Record<PaymentMethodId, number>>;
   bySeller: { name: string; total: number; count: number }[];
-  byCategory: { name: string; total: number }[];
-  byProduct: { productId: string; name: string; quantity: number; total: number }[];
+  byCategory: CategoryProfitEntry[];
+  byProduct: ProductProfitEntry[];
   byDay: { label: string; date: string; total: number; count: number }[];
 }
 
@@ -58,8 +83,8 @@ export function getSalesMetrics(range: DateRange): SalesMetrics {
 
   const byMethod: Partial<Record<PaymentMethodId, number>> = {};
   const bySellerMap = new Map<string, { name: string; total: number; count: number }>();
-  const byCategoryMap = new Map<string, number>();
-  const byProductMap = new Map<string, { productId: string; name: string; quantity: number; total: number }>();
+  const byCategoryMap = new Map<string, { total: number; cost: number }>();
+  const byProductMap = new Map<string, { productId: string; name: string; quantity: number; total: number; cost: number }>();
   const byDayMap = new Map<string, { total: number; count: number }>();
 
   let total = 0;
@@ -86,7 +111,9 @@ export function getSalesMetrics(range: DateRange): SalesMetrics {
     for (const item of sale.items) {
       // Ganancia proporcional al descuento general de la venta.
       const shareFactor = saleGross > 0 ? sale.total / saleGross : 1;
-      profit += item.subtotal * shareFactor - item.costPrice * item.quantity;
+      const itemRevenue = item.subtotal * shareFactor;
+      const itemCost = item.costPrice * item.quantity;
+      profit += itemRevenue - itemCost;
 
       const product = products.find((p) => p.id === item.productId);
       const categoryName = product
@@ -94,16 +121,21 @@ export function getSalesMetrics(range: DateRange): SalesMetrics {
         : item.isCombo
           ? 'Combos'
           : 'Sin categoría';
-      byCategoryMap.set(categoryName, round2((byCategoryMap.get(categoryName) ?? 0) + item.subtotal * shareFactor));
+      const cat = byCategoryMap.get(categoryName) ?? { total: 0, cost: 0 };
+      cat.total = round2(cat.total + itemRevenue);
+      cat.cost = round2(cat.cost + itemCost);
+      byCategoryMap.set(categoryName, cat);
 
       const entry = byProductMap.get(item.productId) ?? {
         productId: item.productId,
         name: item.productName,
         quantity: 0,
         total: 0,
+        cost: 0,
       };
       entry.quantity += item.quantity;
-      entry.total = round2(entry.total + item.subtotal * shareFactor);
+      entry.total = round2(entry.total + itemRevenue);
+      entry.cost = round2(entry.cost + itemCost);
       byProductMap.set(item.productId, entry);
     }
   }
@@ -117,16 +149,36 @@ export function getSalesMetrics(range: DateRange): SalesMetrics {
       count: v.count,
     }));
 
+  const expensesTotal = round2(getExpensesInRange(range).reduce((a, e) => a + e.amount, 0));
+  const purchasesTotal = round2(getPurchasesInRange(range).reduce((a, p) => a + p.total, 0));
+
   return {
     total: round2(total),
     count: sales.length,
     avgTicket: sales.length ? round2(total / sales.length) : 0,
     profit: round2(profit),
     marginPercent: total > 0 ? round2((profit / total) * 100) : 0,
+    expensesTotal,
+    netProfit: round2(profit - expensesTotal),
+    purchasesTotal,
     byMethod,
     bySeller: [...bySellerMap.values()].sort((a, b) => b.total - a.total),
-    byCategory: [...byCategoryMap.entries()].map(([name, t]) => ({ name, total: t })).sort((a, b) => b.total - a.total),
-    byProduct: [...byProductMap.values()].sort((a, b) => b.total - a.total),
+    byCategory: [...byCategoryMap.entries()]
+      .map(([name, v]) => ({
+        name,
+        total: v.total,
+        cost: v.cost,
+        profit: round2(v.total - v.cost),
+        marginPercent: v.total > 0 ? round2(((v.total - v.cost) / v.total) * 100) : 0,
+      }))
+      .sort((a, b) => b.total - a.total),
+    byProduct: [...byProductMap.values()]
+      .map((p) => ({
+        ...p,
+        profit: round2(p.total - p.cost),
+        marginPercent: p.total > 0 ? round2(((p.total - p.cost) / p.total) * 100) : 0,
+      }))
+      .sort((a, b) => b.total - a.total),
     byDay,
   };
 }
@@ -136,5 +188,17 @@ export function getExpensesInRange(range: DateRange) {
     .getState()
     .expenses.filter(
       (e) => e.status === 'active' && isWithinInterval(parseISO(e.date), { start: range.from, end: range.to }),
+    );
+}
+
+/** Compras a proveedores recibidas dentro del período. */
+export function getPurchasesInRange(range: DateRange): Purchase[] {
+  return useSupplierStore
+    .getState()
+    .purchases.filter(
+      (p) =>
+        p.status === 'received' &&
+        p.receivedAt !== null &&
+        isWithinInterval(parseISO(p.receivedAt), { start: range.from, end: range.to }),
     );
 }
