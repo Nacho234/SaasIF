@@ -2,6 +2,8 @@ import type { AuditModule, AuditSeverity } from '@/types';
 import { useAuthStore } from '@/store/authStore';
 import { useAuditStore } from '@/store/auditStore';
 import { generateId } from '@/utils/id';
+import { isProdMode } from '@/config/appMode';
+import { mirrorAuditLog } from './supabase/supabaseAuditNotifService';
 
 interface LogInput {
   action: string;
@@ -13,7 +15,7 @@ interface LogInput {
 
 export function logAudit(input: LogInput): void {
   const user = useAuthStore.getState().user;
-  useAuditStore.getState().addLog({
+  const log = {
     id: generateId(),
     date: new Date().toISOString(),
     userId: user?.id ?? 'system',
@@ -23,7 +25,9 @@ export function logAudit(input: LogInput): void {
     description: input.description,
     severity: input.severity ?? 'info',
     metadata: input.metadata ?? null,
-  });
+  };
+  useAuditStore.getState().addLog(log);
+  if (isProdMode) mirrorAuditLog(log);
 }
 
 /** Registra un intento de acceso a un módulo sin permisos. */

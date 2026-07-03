@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, CheckCheck } from 'lucide-react';
 import { useNotificationStore } from '@/store/notificationStore';
+import { isProdMode } from '@/config/appMode';
+import { markAllNotificationsReadSupabase, markNotificationReadSupabase } from '@/services/supabase/supabaseAuditNotifService';
 import { formatTimeAgo } from '@/utils/format';
 import { NOTIFICATION_TYPE_LABELS } from '@/constants/labels';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -29,7 +31,7 @@ export function NotificationsPage() {
         subtitle={unread.length ? `${unread.length} sin leer` : 'Estás al día'}
         actions={
           unread.length > 0 && (
-            <Button variant="secondary" onClick={markAllRead}>
+            <Button variant="secondary" onClick={() => { markAllRead(); if (isProdMode) markAllNotificationsReadSupabase(); }}>
               <CheckCheck className="size-4" aria-hidden />
               Marcar todas leídas
             </Button>
@@ -61,6 +63,7 @@ export function NotificationsPage() {
                 <button
                   onClick={() => {
                     markRead(n.id);
+                    if (isProdMode) markNotificationReadSupabase(n.id);
                     if (n.actionUrl) navigate(n.actionUrl);
                   }}
                   className="flex w-full cursor-pointer items-start gap-3 px-4 py-3.5 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50"

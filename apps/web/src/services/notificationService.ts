@@ -3,6 +3,8 @@ import { useNotificationStore } from '@/store/notificationStore';
 import { useBusinessStore } from '@/store/businessStore';
 import { generateId } from '@/utils/id';
 import { ROUTES } from '@/constants/routes';
+import { isProdMode } from '@/config/appMode';
+import { mirrorNotification } from './supabase/supabaseAuditNotifService';
 
 interface PushInput {
   title: string;
@@ -15,7 +17,7 @@ export function pushNotification(input: PushInput): void {
   const { notifications, addNotification } = useNotificationStore.getState();
   // Evita duplicar notificaciones no leídas con el mismo título.
   if (notifications.some((n) => !n.read && n.title === input.title)) return;
-  addNotification({
+  const notification = {
     id: generateId(),
     title: input.title,
     description: input.description,
@@ -23,7 +25,9 @@ export function pushNotification(input: PushInput): void {
     read: false,
     date: new Date().toISOString(),
     actionUrl: input.actionUrl ?? null,
-  });
+  };
+  addNotification(notification);
+  if (isProdMode) mirrorNotification(notification);
 }
 
 /** Genera alertas de bajo stock / sin stock después de un cambio de inventario. */
