@@ -5,6 +5,8 @@ import { useBusinessStore } from '@/store/businessStore';
 import { usePermissions } from '@/hooks/usePermissions';
 import { DeleteBusinessModal } from './DeleteBusinessModal';
 import { logAudit } from '@/services/auditService';
+import { isProdMode } from '@/config/appMode';
+import { saveSettings } from '@/services/supabase/supabaseSettingsService';
 import { toast } from '@/store/uiStore';
 import { BUSINESS_CATEGORIES, PRESET_COLORS } from '@/constants/demo';
 import { PAYMENT_METHODS } from '@/constants/paymentMethods';
@@ -58,6 +60,11 @@ export function SettingsPage() {
     }
     updateSettings(draft);
     logAudit({ action: 'settings_updated', module: 'settings', description: 'Modificó la configuración del negocio', severity: 'info' });
+    if (isProdMode) {
+      void saveSettings(draft).catch(() =>
+        toast.error('No se pudo guardar en el servidor', 'Los cambios quedaron locales; reintentá.'),
+      );
+    }
     toast.success('Configuración guardada', 'Los cambios se aplicaron en toda la app.');
   };
 

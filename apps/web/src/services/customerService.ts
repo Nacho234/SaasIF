@@ -8,6 +8,8 @@ import { round2 } from '@/utils/calc';
 import { logAudit } from './auditService';
 import { getOpenRegister } from './cashRegisterService';
 import { customersApi, type CustomerWriteInput } from './api/customersApiService';
+import { registerDebtPaymentSupabase } from './supabase/supabaseAccountService';
+import { toast } from '@/store/uiStore';
 
 /**
  * Facade CRUD de clientes: en prod habla con el backend y refleja en el store (caché reactiva);
@@ -113,11 +115,13 @@ export function registerDebtPayment(input: {
   }
 
   const now = new Date().toISOString();
+  const paymentId = generateId();
+  const amount = round2(input.amount);
   adjustDebt(customer.id, -input.amount);
   addPayment({
-    id: generateId(),
+    id: paymentId,
     customerId: customer.id,
-    amount: round2(input.amount),
+    amount,
     method: input.method,
     date: now,
     userId: user.id,
@@ -127,21 +131,37 @@ export function registerDebtPayment(input: {
 
   // Si hay caja abierta, el pago entra como ingreso.
   const register = getOpenRegister();
+  let cashMovementForRpc: { cashRegisterId: string; method: PaymentMethodId; amount: number; reason: string } | null = null;
   if (register && input.method !== 'customer_credit') {
+    const reason = `Pago de deuda de ${customer.name}`;
+    cashMovementForRpc = { cashRegisterId: register.id, method: input.method, amount, reason };
     useCashStore.getState().addMovement({
       id: generateId(),
       cashRegisterId: register.id,
       type: 'debt_payment',
       direction: 'in',
-      amount: round2(input.amount),
+      amount,
       method: input.method,
-      reason: `Pago de deuda de ${customer.name}`,
+      reason,
       userId: user.id,
       userName: user.name,
       relatedSaleId: null,
       date: now,
       notes: input.notes,
     });
+  }
+
+  if (isProdMode) {
+    void registerDebtPaymentSupabase({
+      id: paymentId,
+      customerId: customer.id,
+      amount,
+      method: input.method,
+      userId: user.id,
+      userName: user.name,
+      notes: input.notes,
+      cashMovement: cashMovementForRpc,
+    }).catch(() => toast.error('No se pudo sincronizar el pago', 'Quedó local; reintentá.'));
   }
 
   logAudit({
