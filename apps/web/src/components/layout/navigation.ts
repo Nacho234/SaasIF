@@ -19,6 +19,7 @@ import {
   Wrench,
   Settings,
   Bookmark,
+  Download,
   type LucideIcon,
 } from 'lucide-react';
 import type { Permission } from '@/types';
@@ -68,6 +69,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Promociones', to: ROUTES.promotions, icon: BadgePercent, permission: 'edit_products' },
       { label: 'Gastos', to: ROUTES.expenses, icon: Banknote, permission: 'register_expenses' },
       { label: 'Reportes', to: ROUTES.reports, icon: BarChart3, permission: 'view_reports' },
+      { label: 'Exportaciones', to: ROUTES.exports, icon: Download, permission: 'view_reports' },
     ],
   },
   {
