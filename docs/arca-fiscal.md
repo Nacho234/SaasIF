@@ -60,6 +60,38 @@ factura autorizada; si ARCA falla → según config: **modo seguro** (no confirm
 sistema lee ambas condiciones fiscales y **sugiere el comprobante**; el vendedor confirma. Nunca tiene
 que entender reglas fiscales.
 
+## Sugerencia de comprobante, cliente fiscal y ticket interno (base)
+
+- **`fiscalDocumentSuggestionService`**: entrada = condición fiscal del emisor + del receptor + monto (+ tipo
+  de operación futuro); salida = tipo de comprobante sugerido + motivo + advertencias. El vendedor **no** elige
+  reglas fiscales: ve "Comprobante sugerido: Factura A/B/C" y confirma.
+- **Flujo POS "¿Cliente pide factura?"** → No / Sí (buscar por CUIT). Si existe, carga datos; si no, **crear
+  cliente fiscal rápido**. Endpoints: `GET /api/customers/search-by-tax-id`, `POST /api/customers/fiscal-quick-create`,
+  `PUT /api/customers/:id/fiscal-data`, `POST /api/fiscal/suggest-document-type`,
+  `GET/PUT /api/fiscal-settings` (+ `/test`, `/validate`), `POST /api/sales/:id/request-fiscal-invoice`,
+  `GET /api/sales/:id/fiscal-status`, `GET /api/arca-errors`, `GET /api/pos/fiscal-config`.
+- **Ticket interno** (siempre): negocio, sucursal, número interno, fecha, productos/cantidades/precios, total,
+  método de pago, cliente (si aplica), vendedor, y **leyenda** cuando no hay factura fiscal:
+  *"Comprobante interno. No válido como factura fiscal."*
+- **Validaciones para emitir factura**: existe `fiscal_settings`, CUIT + condición + punto de venta del emisor,
+  cliente fiscal válido si corresponde, tipo de comprobante definido, ARCA activo para CAE real. Si ARCA **no**
+  está configurado: **no bloquear la venta** → ticket interno + mensaje *"Venta registrada con ticket interno.
+  ARCA no está configurado para emitir factura fiscal."*
+- **Estados**: `fiscal_settings.status` = not_configured/data_loaded/pending_authorization/active/error/disabled;
+  modo fiscal = internal_only/arca_enabled/arca_pending/arca_error. La config fiscal es **opcional** en el
+  onboarding (paso "Configurar facturación fiscal").
+- **Stubs seguros** mientras ARCA real no esté conectado: `arcaService.requestCAE()` puede devolver
+  `simulated_authorized | simulated_error | pending_real_integration`. **Nunca** afirmar que ARCA está conectado
+  si no lo está. Servicios base: `fiscalCustomerService`, `fiscalDocumentSuggestionService` (+ los de la sección ARCA).
+- **Permisos base**: `view_fiscal_settings`, `manage_fiscal_settings`, `issue_fiscal_invoice`. **Frontend base**:
+  `FiscalSettingsPage`, `FiscalCustomerForm`, `FiscalDocumentSuggestion`, `InternalReceiptPreview`,
+  `FiscalReceiptPreview`, `FiscalWarningAlert`. **Auditoría base**: `fiscal.settings.{updated,validated}`,
+  `fiscal.customer_data.{created,updated}`, `fiscal.document_type.suggested`,
+  `sale.created.{internal_ticket,fiscal_pending,fiscal_authorized}`.
+
+> La parte de **medios de pago** que este handoff repetía (payment_settings, procesadores, terminales, modo
+> simple/avanzado) está en [`pagos-avanzados.md`](./pagos-avanzados.md) — no se duplica acá.
+
 ## ARCA en el backend, nunca en el frontend
 
 El frontend no maneja certificados, tokens, claves ni requests a ARCA. Servicios backend:
@@ -71,9 +103,11 @@ registrar todos los intentos (ver estándar de producción, sección ARCA).
 ## Tablas (fase Fiscal) — multi-tenant por `businessId`
 
 - **fiscal_settings** (1 por negocio): campos de arriba.
-- **fiscal_invoices**: `business_id`, `branch_id`, `sale_id`, `cuit_emisor`, `punto_venta`,
-  `tipo_comprobante`, `numero_comprobante`, `cae`, `cae_expiration`, `importe_total`, `status`,
-  `arca_request`, `arca_response`, `error_message`.
+- **fiscal_invoices**: `business_id`, `branch_id`, `sale_id`, `cuit_emisor`, `razon_social_emisor`,
+  `condicion_fiscal_emisor`, `cuit_receptor`, `razon_social_receptor`, `condicion_fiscal_receptor`,
+  `punto_venta`, `tipo_comprobante`, `numero_comprobante`, `cae`, `cae_expiration`, `importe_total`,
+  `status`, `arca_request`, `arca_response`, `error_message`. (Una venta puede existir **sin**
+  `fiscal_invoice` autorizada; una `fiscal_invoice` **siempre** cuelga de una `sale`.)
 - **arca_errors**: `business_id`, `sale_id`, `code`, `message`, `raw_response`.
 - **Notas de crédito** (para revertir ventas fiscales con CAE, no se borran): ver estándar de producción.
 
