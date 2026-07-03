@@ -8,9 +8,7 @@
   ],
   "scripts": {
     "dev:web": "npm run dev -w @mostrador/web",
-    "dev:api": "npm run start:dev -w @mostrador/api",
     "build:web": "npm run build -w @mostrador/web",
-    "build:api": "npm run build -w @mostrador/api",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "smoke": "npm run smoke -w @mostrador/web"
   },
