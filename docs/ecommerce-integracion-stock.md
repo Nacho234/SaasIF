@@ -113,7 +113,55 @@ online recibida/fallida, webhook rechazado.
 por `external_order_id`). 3. No mezclar datos entre negocios. 4. Validar API keys + firma de webhooks.
 5. El backend siempre verifica stock real antes de descontar. 6. Vincular por SKU/mapeo externo. 7. Registrar
 todos los errores de sync. 8. Notificar si una orden online no se pudo procesar. 9. Permitir reintentar sync.
-10. **Desactivar la integración no debe romper el POS.**
+10. **Desactivar la integración no debe romper el POS.** 11. **Un producto externo NO mapeado no descuenta stock.**
+12. **El `businessId` sale SIEMPRE de la API key / integración validada**, nunca de un frontend externo.
+
+## Reglas de implementación (no romper lo existente)
+
+Antes de tocar código, **analizar la arquitectura actual**: cómo está modelado producto/stock, cómo descuenta
+el POS, cómo se registran `inventory_movements`, cómo se maneja `businessId`/`branchId`/`warehouseId`, auditoría,
+notificaciones, manejo de errores, y qué endpoints ya existen. Luego:
+
+- **Módulo nuevo y aislado** (`ecommerce`), servicios separados — **no** meter la lógica en controllers
+  existentes, ni todo en un solo controller/función. La venta local sigue **exactamente igual**, y además
+  puede **disparar** `stock.updated` cuando corresponda.
+- **No hardcodear plataformas.** No asumir que todos los negocios tienen e-commerce, ni que todos los
+  productos están mapeados / tienen SKU externo, ni que stock y precio se sincronizan siempre.
+- Cada **negocio** activa/desactiva la integración; cada **producto (mapping)** decide si sincroniza
+  `stock`, `precio` y/o `datos` (`syncStock`/`syncPrice`/`syncName` por mapping).
+- No romper: **POS, stock, cierre de caja, reportes, auditoría**.
+
+## Origen de venta (`sale.source`) — diferenciar online vs local
+
+La venta debe registrar su origen para reportes. Campo `sale.source`: `pos | ecommerce | manual | import | other`.
+Para ventas online: `source = ecommerce`, `externalOrderId = <id externo>`, `integrationId = <id integración>`.
+Permite filtrar ventas por local físico / online / plataforma / integración.
+
+## Transacción atómica del pedido online (todo o nada)
+
+Procesar la orden online **dentro de una transacción**. Orden de pasos: validar integración + firma +
+`external_order_id` → si ya existe `ecommerce_order` en `processed` **no re-descontar** → si no, crear
+`ecommerce_order` en `processing` → buscar productos por SKU/mapping → **verificar stock real** → si falta,
+marcar `stock_error` + notificar + log (**sin** descontar) → si alcanza: crear venta/pedido online + `sale_items`
++ `payment` (si aplica) → **descontar stock** → `inventory_movements` → `cash_movement` solo si el modelo lo
+requiere → `audit_log` → marcar `ecommerce_order = processed` → **commit**. Si falla cualquier paso crítico:
+**rollback total** (sin venta parcial, sin stock parcial, sin movimientos inconsistentes), error controlado + notificación.
+
+## Detalle de API keys y estados
+
+- **api_keys**: guardar **hash** (`keyHash`), nunca texto plano; `keyPrefix` para identificarla; mostrar la key
+  completa **una sola vez** al crearla; en la UI enmascarar (`•••• •••• •••• 8F2A`). Campos: `permissions`
+  (read_products/read_stock/write_orders/write_stock_reservations/read_prices), `status`, `lastUsedAt`, `revokedAt`.
+- **Integration status**: `active | inactive | error | pending_setup | disconnected`.
+- **ecommerce_product_mappings**: único `(businessId, integrationId, productId)`.
+- **ecommerce_orders**: suma `errorMessage`; único `(businessId, integrationId, externalOrderId)`.
+- Secretos externos (`api_secret`, `access_token`, `refresh_token`) **cifrados**; nunca exponerlos en frontend.
+
+## Auditoría (taxonomía de eventos)
+
+`ecommerce.integration.{created,updated,disabled,tested}`, `ecommerce.api_key.{created,revoked}`,
+`ecommerce.product_mapping.{created,updated,deleted}`, `ecommerce.stock.sync.{started,completed,failed}`,
+`ecommerce.order.{received,processed,stock_error}`, `ecommerce.webhook.{rejected,processed}`.
 
 ## Dependencias / roadmap
 
