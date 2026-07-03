@@ -4,7 +4,7 @@ import { Banknote, BookUser, Pencil, Power, Receipt, Users } from 'lucide-react'
 import { useCustomerStore } from '@/store/customerStore';
 import { useSalesStore } from '@/store/salesStore';
 import { useBusinessStore } from '@/store/businessStore';
-import { registerDebtPayment } from '@/services/customerService';
+import { registerDebtPayment, updateCustomerData } from '@/services/customerService';
 import { logAudit } from '@/services/auditService';
 import { toast, useUiStore } from '@/store/uiStore';
 import { formatCurrency, formatFriendlyDateTime, formatMoney } from '@/utils/format';
@@ -29,7 +29,6 @@ export function CustomerDetailPage() {
   const navigate = useNavigate();
   const customer = useCustomerStore((s) => s.customers.find((c) => c.id === id));
   const allPayments = useCustomerStore((s) => s.payments);
-  const updateCustomer = useCustomerStore((s) => s.updateCustomer);
   const allSales = useSalesStore((s) => s.sales);
   const payments = useMemo(() => allPayments.filter((p) => p.customerId === id), [allPayments, id]);
   const sales = useMemo(() => allSales.filter((x) => x.customerId === id), [allSales, id]);
@@ -91,8 +90,9 @@ export function CustomerDetailPage() {
       danger: customer.isActive,
       confirmLabel: customer.isActive ? 'Desactivar' : 'Reactivar',
       onConfirm: () => {
-        updateCustomer(customer.id, { isActive: !customer.isActive });
-        toast.success(customer.isActive ? 'Cliente desactivado' : 'Cliente reactivado');
+        void updateCustomerData(customer.id, { isActive: !customer.isActive })
+          .then(() => toast.success(customer.isActive ? 'Cliente desactivado' : 'Cliente reactivado'))
+          .catch(() => toast.error('No se pudo actualizar el cliente.'));
       },
     });
   };

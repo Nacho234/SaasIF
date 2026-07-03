@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Customer } from '@/types';
-import { useCustomerStore } from '@/store/customerStore';
-import { generateId } from '@/utils/id';
+import { createCustomer, updateCustomerData } from '@/services/customerService';
+import { ApiError } from '@/services/api/apiClient';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -18,9 +18,6 @@ export function CustomerFormModal({
   editing?: Customer | null;
   onSaved?: (customer: Customer) => void;
 }) {
-  const addCustomer = useCustomerStore((s) => s.addCustomer);
-  const updateCustomer = useCustomerStore((s) => s.updateCustomer);
-
   const [form, setForm] = useState({
     name: '',
     phone: '',
@@ -33,6 +30,7 @@ export function CustomerFormModal({
     notes: '',
   });
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -53,38 +51,38 @@ export function CustomerFormModal({
 
   const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
 
-  const submit = () => {
+  const submit = async () => {
     if (!form.name.trim()) {
       setError('El nombre es obligatorio.');
       return;
     }
     const tags = form.tags.split(',').map((t) => t.trim()).filter(Boolean);
     const birthDate = form.birthDate ? new Date(form.birthDate).toISOString() : null;
-    if (editing) {
-      updateCustomer(editing.id, { ...form, name: form.name.trim(), tags, birthDate });
-      onSaved?.({ ...editing, ...form, name: form.name.trim(), tags, birthDate });
-    } else {
-      const now = new Date().toISOString();
-      const customer: Customer = {
-        id: generateId(),
-        name: form.name.trim(),
-        phone: form.phone,
-        email: form.email,
-        document: form.document,
-        cuit: form.cuit,
-        address: form.address,
-        birthDate,
-        notes: form.notes,
-        tags,
-        isActive: true,
-        debtBalance: 0,
-        createdAt: now,
-        updatedAt: now,
-      };
-      addCustomer(customer);
-      onSaved?.(customer);
+    const data = {
+      name: form.name.trim(),
+      phone: form.phone,
+      email: form.email,
+      document: form.document,
+      cuit: form.cuit,
+      address: form.address,
+      birthDate,
+      notes: form.notes,
+      tags,
+    };
+    setSaving(true);
+    try {
+      if (editing) {
+        await updateCustomerData(editing.id, data);
+        onSaved?.({ ...editing, ...data });
+      } else {
+        const customer = await createCustomer(data);
+        onSaved?.(customer);
+      }
+      onClose();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo guardar el cliente.');
+      setSaving(false);
     }
-    onClose();
   };
 
   return (
@@ -95,8 +93,8 @@ export function CustomerFormModal({
       size="lg"
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>Cancelar</Button>
-          <Button onClick={submit}>{editing ? 'Guardar cambios' : 'Crear cliente'}</Button>
+          <Button variant="secondary" onClick={onClose} disabled={saving}>Cancelar</Button>
+          <Button onClick={submit} loading={saving}>{editing ? 'Guardar cambios' : 'Crear cliente'}</Button>
         </>
       }
     >

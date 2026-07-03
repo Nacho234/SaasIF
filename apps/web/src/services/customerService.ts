@@ -1,4 +1,5 @@
 import type { Customer, PaymentMethodId } from '@/types';
+import { isProdMode } from '@/config/appMode';
 import { useAuthStore } from '@/store/authStore';
 import { useCustomerStore } from '@/store/customerStore';
 import { useCashStore } from '@/store/cashStore';
@@ -6,6 +7,67 @@ import { generateId } from '@/utils/id';
 import { round2 } from '@/utils/calc';
 import { logAudit } from './auditService';
 import { getOpenRegister } from './cashRegisterService';
+import { customersApi, type CustomerWriteInput } from './api/customersApiService';
+
+/**
+ * Facade CRUD de clientes: en prod habla con el backend y refleja en el store (caché reactiva);
+ * en demo opera sobre el store local. Lo usan las pantallas de gestión de clientes.
+ */
+
+/** Carga los clientes del backend al store (solo prod). En demo ya está sembrado. */
+export async function loadCustomers(): Promise<void> {
+  if (!isProdMode) return;
+  const customers = await customersApi.list();
+  useCustomerStore.getState().replaceAll({ customers });
+}
+
+export async function createCustomer(input: CustomerWriteInput): Promise<Customer> {
+  if (isProdMode) {
+    const customer = await customersApi.create(input);
+    useCustomerStore.getState().addCustomer(customer);
+    return customer;
+  }
+  const now = new Date().toISOString();
+  const customer: Customer = {
+    id: generateId(),
+    name: input.name,
+    phone: input.phone ?? '',
+    email: input.email ?? '',
+    document: input.document ?? '',
+    cuit: input.cuit ?? '',
+    address: input.address ?? '',
+    birthDate: input.birthDate ?? null,
+    notes: input.notes ?? '',
+    tags: input.tags ?? [],
+    isActive: true,
+    debtBalance: 0,
+    createdAt: now,
+    updatedAt: now,
+  };
+  useCustomerStore.getState().addCustomer(customer);
+  logAudit({ action: 'customer_created', module: 'customers', description: `Creó el cliente "${customer.name}"`, severity: 'success' });
+  return customer;
+}
+
+export async function updateCustomerData(id: string, patch: Partial<Customer>): Promise<Customer | void> {
+  if (isProdMode) {
+    const customer = await customersApi.update(id, {
+      name: patch.name ?? undefined,
+      phone: patch.phone,
+      email: patch.email,
+      document: patch.document,
+      cuit: patch.cuit,
+      address: patch.address,
+      birthDate: patch.birthDate,
+      notes: patch.notes,
+      tags: patch.tags,
+      isActive: patch.isActive,
+    } as CustomerWriteInput);
+    useCustomerStore.getState().updateCustomer(id, customer);
+    return customer;
+  }
+  useCustomerStore.getState().updateCustomer(id, patch);
+}
 
 export function createQuickCustomer(name: string, phone = ''): Customer {
   const now = new Date().toISOString();

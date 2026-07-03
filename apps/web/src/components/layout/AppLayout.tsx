@@ -9,6 +9,7 @@ import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { usePermissions } from '@/hooks/usePermissions';
 import { isProdMode } from '@/config/appMode';
 import { loadCatalog } from '@/services/catalogService';
+import { loadCustomers } from '@/services/customerService';
 import { toast } from '@/store/uiStore';
 import { ROUTES } from '@/constants/routes';
 
@@ -22,10 +23,11 @@ export function AppLayout() {
     f2: () => can('sell') && navigate(ROUTES.pos),
   });
 
-  // En modo prod, trae el catálogo del backend al entrar (en demo ya está sembrado).
+  // En modo prod, trae catálogo y clientes del backend al entrar (en demo ya está sembrado).
   useEffect(() => {
     if (!isProdMode) return;
     loadCatalog().catch(() => toast.error('No se pudo cargar el catálogo', 'Revisá tu conexión con el servidor.'));
+    loadCustomers().catch(() => toast.error('No se pudieron cargar los clientes', 'Revisá tu conexión con el servidor.'));
   }, []);
 
   return (
