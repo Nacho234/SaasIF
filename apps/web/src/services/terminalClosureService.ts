@@ -5,6 +5,9 @@ import { generateId } from '@/utils/id';
 import { round2 } from '@/utils/calc';
 import { getRegisterSummary } from './cashRegisterService';
 import { logAudit } from './auditService';
+import { isProdMode } from '@/config/appMode';
+import { supabase } from './supabase/supabaseClient';
+import { mirrorTerminalClosure } from './supabase/supabaseCashService';
 
 export function getTerminalClosures(registerId: string): TerminalClosure[] {
   return useCashStore.getState().terminalClosures.filter((t) => t.cashRegisterId === registerId);
@@ -70,6 +73,7 @@ export function addTerminalClosure(input: TerminalClosureInput): { ok: boolean; 
   };
 
   useCashStore.getState().addTerminalClosure(terminal);
+  if (isProdMode) mirrorTerminalClosure(terminal);
   logAudit({
     action: 'terminal_closed',
     module: 'cash',
@@ -85,4 +89,11 @@ export function addTerminalClosure(input: TerminalClosureInput): { ok: boolean; 
 
 export function removeTerminalClosure(id: string): void {
   useCashStore.getState().removeTerminalClosure(id);
+  if (isProdMode) {
+    void supabase
+      .from('terminal_closures')
+      .delete()
+      .eq('id', id)
+      .then(({ error }) => { if (error) console.error('terminal_closure delete', error.message); });
+  }
 }
