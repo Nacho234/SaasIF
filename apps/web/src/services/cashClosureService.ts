@@ -7,6 +7,8 @@ import { useAuthStore } from '@/store/authStore';
 import { useBusinessStore } from '@/store/businessStore';
 import { logAudit } from './auditService';
 import { pushNotification } from './notificationService';
+import { isProdMode } from '@/config/appMode';
+import { mirrorRegister } from './supabase/supabaseCashService';
 
 export interface StockSummary {
   unitsSold: number;
@@ -94,7 +96,9 @@ export function reopenRegister(input: { registerId: string; reason: string }): {
   );
   if (anotherOpen) return { ok: false, error: `Ya hay otra caja abierta (${anotherOpen.number}). Cerrala primero.` };
 
-  store.updateRegister(register.id, { status: 'reopened', closedAt: null, closedById: null, closedByName: null });
+  const reopenPatch = { status: 'reopened' as const, closedAt: null, closedById: null, closedByName: null };
+  store.updateRegister(register.id, reopenPatch);
+  if (isProdMode) mirrorRegister({ ...register, ...reopenPatch });
   logAudit({
     action: 'cash_reopened',
     module: 'cash',

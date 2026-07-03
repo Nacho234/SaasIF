@@ -12,6 +12,7 @@
     "smoke": "NODE_OPTIONS=--localstorage-file=/tmp/mostrador-smoke-ls.json tsx --tsconfig tsconfig.app.json scripts/smoke.ts"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.110.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.525.0",

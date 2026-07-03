@@ -15,6 +15,8 @@ import { logAudit } from './auditService';
 import { pushNotification } from './notificationService';
 import { getStockSummaryForRegister, nextClosureVersion } from './cashClosureService';
 import { ROUTES } from '@/constants/routes';
+import { isProdMode } from '@/config/appMode';
+import { mirrorClosure, mirrorMovement, mirrorRegister } from './supabase/supabaseCashService';
 
 export interface RegisterSummary {
   movements: CashMovement[];
@@ -129,21 +131,26 @@ export function openRegister(input: { openingAmount: number; notes: string }): {
     openingNotes: input.notes,
     closingNotes: '',
   };
-  store.addRegister(register);
-  store.addMovement({
+  const openingMovement = {
     id: generateId(),
     cashRegisterId: register.id,
-    type: 'opening',
-    direction: 'in',
+    type: 'opening' as const,
+    direction: 'in' as const,
     amount: register.openingAmount,
-    method: 'cash',
+    method: 'cash' as const,
     reason: 'Apertura de caja',
     userId: user.id,
     userName: user.name,
     relatedSaleId: null,
     date: now,
     notes: input.notes,
-  });
+  };
+  store.addRegister(register);
+  store.addMovement(openingMovement);
+  if (isProdMode) {
+    mirrorRegister(register);
+    mirrorMovement(openingMovement);
+  }
   logAudit({
     action: 'cash_opened',
     module: 'cash',
@@ -175,7 +182,7 @@ export function addCashMovement(input: {
   const direction =
     input.type === 'manual_income' ? 'in' : input.type === 'correction' ? (input.direction ?? 'in') : 'out';
 
-  useCashStore.getState().addMovement({
+  const movement = {
     id: generateId(),
     cashRegisterId: register.id,
     type: input.type,
@@ -188,7 +195,9 @@ export function addCashMovement(input: {
     relatedSaleId: null,
     date: new Date().toISOString(),
     notes: input.notes ?? '',
-  });
+  };
+  useCashStore.getState().addMovement(movement);
+  if (isProdMode) mirrorMovement(movement);
   logAudit({
     action: 'cash_movement',
     module: 'cash',
@@ -260,22 +269,23 @@ export function closeRegister(input: CloseRegisterInput): CloseRegisterResult {
 
   const now = new Date().toISOString();
   const store = useCashStore.getState();
-  store.addMovement({
+  const closingMovement = {
     id: generateId(),
     cashRegisterId: register.id,
-    type: 'closing',
-    direction: 'out',
+    type: 'closing' as const,
+    direction: 'out' as const,
     amount: 0,
-    method: 'cash',
+    method: 'cash' as const,
     reason: 'Cierre de caja',
     userId: user.id,
     userName: user.name,
     relatedSaleId: null,
     date: now,
     notes: input.notes,
-  });
-  const status = difference === 0 ? 'closed' : 'closed_with_difference';
-  store.updateRegister(register.id, {
+  };
+  store.addMovement(closingMovement);
+  const status = difference === 0 ? ('closed' as const) : ('closed_with_difference' as const);
+  const registerPatch = {
     closedAt: now,
     closedById: user.id,
     closedByName: user.name,
@@ -284,7 +294,8 @@ export function closeRegister(input: CloseRegisterInput): CloseRegisterResult {
     difference,
     status,
     closingNotes: input.notes,
-  });
+  };
+  store.updateRegister(register.id, registerPatch);
 
   // Snapshot inmutable (Hoja de Cierre Diario).
   const stock = getStockSummaryForRegister(register.id);
@@ -326,6 +337,12 @@ export function closeRegister(input: CloseRegisterInput): CloseRegisterResult {
     createdAt: now,
   };
   store.addClosure(closure);
+
+  if (isProdMode) {
+    mirrorMovement(closingMovement);
+    mirrorRegister({ ...register, ...registerPatch });
+    mirrorClosure(closure);
+  }
 
   logAudit({
     action: 'cash_closed',
