@@ -5,6 +5,8 @@ import { useSupplierStore } from '@/store/supplierStore';
 import { useProductStore } from '@/store/productStore';
 import { useAuthStore } from '@/store/authStore';
 import { logAudit } from '@/services/auditService';
+import { isProdMode } from '@/config/appMode';
+import { mirrorPurchase } from '@/services/supabase/supabaseSuppliersService';
 import { toast } from '@/store/uiStore';
 import { generateId, generatePurchaseNumber } from '@/utils/id';
 import { round2 } from '@/utils/calc';
@@ -84,6 +86,7 @@ export function PurchaseCreatePage() {
       receivedAt: null,
     };
     store.addPurchase(purchase);
+    if (isProdMode) mirrorPurchase(purchase);
     logAudit({
       action: 'purchase_created',
       module: 'purchases',

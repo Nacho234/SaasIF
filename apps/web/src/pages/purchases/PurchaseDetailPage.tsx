@@ -2,6 +2,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Ban, ClipboardList, PackageCheck, Send } from 'lucide-react';
 import { useSupplierStore } from '@/store/supplierStore';
 import { receivePurchase } from '@/services/purchaseService';
+import { isProdMode } from '@/config/appMode';
+import { mirrorPurchase } from '@/services/supabase/supabaseSuppliersService';
 import { logAudit } from '@/services/auditService';
 import { toast, useUiStore } from '@/store/uiStore';
 import { formatCurrency, formatFriendlyDateTime } from '@/utils/format';
@@ -31,6 +33,7 @@ export function PurchaseDetailPage() {
 
   const markSent = () => {
     updatePurchase(purchase.id, { status: 'sent' });
+    if (isProdMode) mirrorPurchase({ ...purchase, status: 'sent' });
     logAudit({ action: 'purchase_sent', module: 'purchases', description: `Marcó la compra ${purchase.number} como enviada` });
     toast.success('Compra marcada como enviada');
   };
@@ -56,6 +59,7 @@ export function PurchaseDetailPage() {
       danger: true,
       onConfirm: () => {
         updatePurchase(purchase.id, { status: 'cancelled' });
+        if (isProdMode) mirrorPurchase({ ...purchase, status: 'cancelled' });
         logAudit({ action: 'purchase_cancelled', module: 'purchases', description: `Canceló la compra ${purchase.number}`, severity: 'warning' });
         toast.success('Compra cancelada');
       },
