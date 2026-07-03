@@ -14,6 +14,7 @@ import { getOpenRegister } from './cashRegisterService';
 import { ROUTES } from '@/constants/routes';
 import { isProdMode } from '@/config/appMode';
 import { createSaleSupabase } from './supabase/supabaseSalesService';
+import { mirrorMovement as mirrorInventoryMovement } from './supabase/supabaseInventoryService';
 import { toast } from '@/store/uiStore';
 
 export interface CartLine {
@@ -183,7 +184,7 @@ function applyStockForSale(sale: Sale, direction: 'out' | 'in', reason: string, 
     const previous = product.stock;
     const next = direction === 'out' ? previous - qty : previous + qty;
     productStore.setStock(productId, next);
-    inventoryStore.addMovement({
+    const movement = {
       id: generateId(),
       productId,
       productName: product.name,
@@ -198,7 +199,9 @@ function applyStockForSale(sale: Sale, direction: 'out' | 'in', reason: string, 
       relatedPurchaseId: null,
       date: new Date().toISOString(),
       notes: '',
-    });
+    };
+    inventoryStore.addMovement(movement);
+    if (isProdMode) mirrorInventoryMovement(movement);
     if (direction === 'out') checkStockAlerts({ ...product, stock: next });
   }
 }

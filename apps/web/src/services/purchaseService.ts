@@ -6,6 +6,7 @@ import { generateId } from '@/utils/id';
 import { logAudit } from './auditService';
 import { isProdMode } from '@/config/appMode';
 import { receivePurchaseSupabase } from './supabase/supabaseSuppliersService';
+import { mirrorMovement as mirrorInventoryMovement } from './supabase/supabaseInventoryService';
 import { toast } from '@/store/uiStore';
 
 /** Marca una compra como recibida: suma stock y actualiza costos. */
@@ -28,11 +29,11 @@ export function receivePurchase(purchaseId: string): { ok: boolean; error?: stri
     const previous = product.stock;
     const next = previous + item.quantity;
     productStore.updateProduct(product.id, { stock: next, costPrice: item.unitCost });
-    inventoryStore.addMovement({
+    const movement = {
       id: generateId(),
       productId: product.id,
       productName: product.name,
-      type: 'purchase',
+      type: 'purchase' as const,
       quantity: item.quantity,
       previousStock: previous,
       newStock: next,
@@ -43,7 +44,9 @@ export function receivePurchase(purchaseId: string): { ok: boolean; error?: stri
       relatedPurchaseId: purchase.id,
       date: now,
       notes: '',
-    });
+    };
+    inventoryStore.addMovement(movement);
+    if (isProdMode) mirrorInventoryMovement(movement);
   }
 
   updatePurchase(purchase.id, { status: 'received', receivedAt: now });

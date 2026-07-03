@@ -16,6 +16,7 @@ import { loadSales } from '@/services/supabase/supabaseSalesService';
 import { loadReturns } from '@/services/supabase/supabaseReturnsService';
 import { loadSettings } from '@/services/supabase/supabaseSettingsService';
 import { loadSuppliers } from '@/services/supabase/supabaseSuppliersService';
+import { loadInventoryMovements } from '@/services/supabase/supabaseInventoryService';
 import { toast } from '@/store/uiStore';
 import { ROUTES } from '@/constants/routes';
 
@@ -39,6 +40,7 @@ export function AppLayout() {
     loadSales().catch(() => toast.error('No se pudieron cargar las ventas', 'Revisá tu conexión con el servidor.'));
     loadReturns().catch(() => {});
     loadSuppliers().catch(() => {});
+    loadInventoryMovements().catch(() => {});
     loadSettings().catch(() => {});
   }, []);
 

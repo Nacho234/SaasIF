@@ -13,6 +13,7 @@ import { getOpenRegister } from './cashRegisterService';
 import { ROUTES } from '@/constants/routes';
 import { isProdMode } from '@/config/appMode';
 import { createReturnSupabase } from './supabase/supabaseReturnsService';
+import { mirrorMovement as mirrorInventoryMovement } from './supabase/supabaseInventoryService';
 import { toast } from '@/store/uiStore';
 
 export interface ReturnDraft {
@@ -95,11 +96,11 @@ export function createReturn(draft: ReturnDraft): { ok: boolean; error?: string;
       const product = useProductStore.getState().products.find((p) => p.id === comp.productId);
       if (!product) continue;
       productStore.setStock(product.id, product.stock + comp.quantity);
-      inventoryStore.addMovement({
+      const movement = {
         id: generateId(),
         productId: product.id,
         productName: product.name,
-        type: 'return',
+        type: 'return' as const,
         quantity: comp.quantity,
         previousStock: product.stock,
         newStock: product.stock + comp.quantity,
@@ -110,7 +111,9 @@ export function createReturn(draft: ReturnDraft): { ok: boolean; error?: string;
         relatedPurchaseId: null,
         date: now,
         notes: '',
-      });
+      };
+      inventoryStore.addMovement(movement);
+      if (isProdMode) mirrorInventoryMovement(movement);
     }
   }
 
