@@ -6,6 +6,8 @@ import { useInventoryStore } from '@/store/inventoryStore';
 import { generateId } from '@/utils/id';
 import { logAudit } from './auditService';
 import { checkStockAlerts } from './notificationService';
+import { isProdMode } from '@/config/appMode';
+import { mirrorMovement, persistStock } from './supabase/supabaseInventoryService';
 
 /** Ingreso/egreso/ajuste manual de stock. */
 export function adjustStock(input: {
@@ -34,7 +36,7 @@ export function adjustStock(input: {
   }
 
   useProductStore.getState().setStock(product.id, next);
-  useInventoryStore.getState().addMovement({
+  const movement = {
     id: generateId(),
     productId: product.id,
     productName: product.name,
@@ -49,7 +51,12 @@ export function adjustStock(input: {
     relatedPurchaseId: null,
     date: new Date().toISOString(),
     notes: input.notes ?? '',
-  });
+  };
+  useInventoryStore.getState().addMovement(movement);
+  if (isProdMode) {
+    persistStock(product.id, next); // el ajuste manual sí cambia el stock en Supabase
+    mirrorMovement(movement);
+  }
   if (!isIn) checkStockAlerts({ ...product, stock: next });
 
   logAudit({
