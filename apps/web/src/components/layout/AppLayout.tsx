@@ -17,6 +17,7 @@ import { loadReturns } from '@/services/supabase/supabaseReturnsService';
 import { loadSettings } from '@/services/supabase/supabaseSettingsService';
 import { loadSuppliers } from '@/services/supabase/supabaseSuppliersService';
 import { loadInventoryMovements } from '@/services/supabase/supabaseInventoryService';
+import { loadAuditLogs, loadNotifications } from '@/services/supabase/supabaseAuditNotifService';
 import { toast } from '@/store/uiStore';
 import { ROUTES } from '@/constants/routes';
 
@@ -41,6 +42,8 @@ export function AppLayout() {
     loadReturns().catch(() => {});
     loadSuppliers().catch(() => {});
     loadInventoryMovements().catch(() => {});
+    loadAuditLogs().catch(() => {});
+    loadNotifications().catch(() => {});
     loadSettings().catch(() => {});
   }, []);
 
