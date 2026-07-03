@@ -12,6 +12,7 @@ import { loadCatalog } from '@/services/catalogService';
 import { loadCustomers } from '@/services/customerService';
 import { loadCash } from '@/services/supabase/supabaseCashService';
 import { loadSales } from '@/services/supabase/supabaseSalesService';
+import { loadSettings } from '@/services/supabase/supabaseSettingsService';
 import { toast } from '@/store/uiStore';
 import { ROUTES } from '@/constants/routes';
 
@@ -32,6 +33,7 @@ export function AppLayout() {
     loadCustomers().catch(() => toast.error('No se pudieron cargar los clientes', 'Revisá tu conexión con el servidor.'));
     loadCash().catch(() => toast.error('No se pudo cargar la caja', 'Revisá tu conexión con el servidor.'));
     loadSales().catch(() => toast.error('No se pudieron cargar las ventas', 'Revisá tu conexión con el servidor.'));
+    loadSettings().catch(() => {});
   }, []);
 
   return (
