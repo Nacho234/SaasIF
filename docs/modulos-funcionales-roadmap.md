@@ -77,10 +77,13 @@ devolver / cuenta corriente / usar en compra), igual (solo mueve stock). Registr
 nuevo + pago/saldo de la diferencia + movimientos de stock/caja.
 
 - **returns** (type: refund/exchange/partial_return; difference_direction: customer_pays/business_refunds/even),
-  **return_items** (restock, stock_condition), **exchange_items**, **return_payments**
-  (additional_payment/refund_to_customer/customer_credit).
-- Reglas: no devolver más que lo comprado; no sobre venta anulada; no stock automático si no vuelve sano;
-  si había factura → nota de crédito (+ nueva factura si corresponde, ver `contracargos-notas-credito.md`); todo auditado.
+  **return_items** (`restock`, `stock_condition`: sellable/damaged/opened/expired/lost/not_returned),
+  **exchange_items**, **return_payments** (additional_payment/refund_to_customer/customer_credit).
+- Motivos: se arrepintió / defectuoso / equivocado / cambio / error de carga / garantía / otro.
+- Reglas: no devolver más que lo comprado; **no devolver dos veces la misma unidad**; no sobre venta anulada;
+  si vuelve sano → stock vendible, si dañado → depósito de dañados, si no vuelve → no suma stock; si devuelve
+  dinero → movimiento de caja, si queda a favor → cuenta corriente; si había factura → nota de crédito
+  (+ nueva factura si corresponde, ver `contracargos-notas-credito.md`); todo auditado.
 
 ## 5. Cuenta corriente (post-Ventas)
 
@@ -89,6 +92,8 @@ Ventas fiadas, pagos parciales, saldos a favor, límite de crédito, bloqueo por
 - **customer_accounts** (customer_id, current_balance, credit_limit, is_blocked), **customer_account_movements**
   (type: debt/payment/credit/adjustment/refund/exchange_difference, sale_id/return_id, amount).
 - Flujo: venta con método "cuenta corriente" → suma deuda; pago posterior → descuenta. Notificar al superar el límite.
+- Reglas: **requiere cliente** (nunca cuenta corriente para consumidor anónimo); el pago en efectivo/transferencia/
+  tarjeta genera movimiento de caja; registrar recibo; todo auditado.
 
 ## 6. Multi-sucursal y transferencias de stock
 
@@ -158,7 +163,64 @@ estos módulos: 1. Roles detallados → 2. Onboarding → 3. Códigos de barras 
 
 ## Auditoría obligatoria (en todos)
 
-Cambio de rol/permisos, fin de onboarding, compra, ingreso/transferencia de stock, devolución, cambio,
-pago de diferencia, saldo a favor, movimiento de cuenta corriente, código de barras creado, etiqueta impresa,
-exportación, notificación crítica, ticket de soporte. Guardar `business_id, branch_id, user_id, entity, action,
-description, metadata, created_at`.
+Cambio de rol/permisos, fin de onboarding, compra registrada/recibida, ingreso/transferencia/recepción de stock,
+devolución, cambio, pago de diferencia, saldo a favor, movimiento de cuenta corriente, código de barras creado,
+etiqueta impresa/exportada, exportación de datos, notificación crítica, ticket de soporte, **acción bloqueada por
+permisos**. Guardar `business_id, branch_id, user_id, action, module, entity_type, entity_id, description,
+metadata, created_at`.
+
+## Detalle técnico (del handoff completo)
+
+### Servicios backend
+`permissionService`, `roleService`, `onboardingService`, `supplierService`, `purchaseService`,
+`purchaseReceivingService`, `returnService`, `exchangeService`, `customerAccountService`, `branchService`,
+`warehouseService`, `stockTransferService`, `barcodeService`, `labelService`, `exportService`,
+`notificationService`, `supportTicketService`, `auditService`. Cada uno: filtra por `businessId`, valida permisos,
+audita, usa transacciones en operaciones críticas, devuelve errores controlados.
+
+### Endpoints (por módulo)
+- **Roles/permisos**: `GET/POST /api/roles`, `GET/PUT/DELETE /api/roles/:id`, `GET /api/permissions`,
+  `POST /api/roles/:id/permissions`, `PUT /api/users/:id/roles`. Middleware `requirePermission("...")` en cada endpoint crítico.
+- **Onboarding**: `GET/PUT /api/onboarding`, `POST /api/onboarding/complete-step`, `POST /api/onboarding/complete`.
+- **Proveedores**: `GET/POST /api/suppliers`, `GET/PUT/DELETE /api/suppliers/:id`.
+- **Compras**: `GET/POST /api/purchases`, `GET/PUT /api/purchases/:id`, `POST /api/purchases/:id/{receive,cancel}`.
+- **Devoluciones/cambios**: `GET/POST /api/returns`, `GET /api/returns/:id`, `POST /api/exchanges`, `GET /api/exchanges/:id`.
+- **Cuenta corriente**: `GET /api/customers/:id/account`, `POST /api/customers/:id/account/{payment,adjustment}`,
+  `GET /api/customers/:id/account/movements`.
+- **Sucursales/depósitos**: `GET/POST /api/branches`, `GET/PUT /api/branches/:id`, `GET/POST /api/warehouses`, `PUT /api/warehouses/:id`.
+- **Transferencias**: `GET/POST /api/stock-transfers`, `GET /api/stock-transfers/:id`, `POST /api/stock-transfers/:id/{send,receive,cancel}`.
+- **Códigos de barras**: `GET/POST /api/products/:id/barcodes`, `PUT/DELETE /api/product-barcodes/:id`, `GET /api/products/search-by-barcode/:code`.
+- **Etiquetas**: `POST /api/labels/{preview,export}`.
+- **Exportaciones**: `GET/POST /api/exports`, `GET /api/exports/:id`.
+- **Notificaciones**: `GET /api/notifications`, `POST /api/notifications/:id/read`, `POST /api/notifications/read-all`.
+- **Soporte**: `GET/POST /api/support/tickets`, `GET/PUT /api/support/tickets/:id`, `GET /api/support/help-center`.
+
+### Frontend (páginas y componentes)
+Páginas: RolesPage, PermissionsPage, OnboardingPage, Suppliers(+Detail), Purchases(+Detail/Create),
+Returns(+CreateReturn), CreateExchange, CustomerAccount, Branches, Warehouses, StockTransfers(+Detail),
+ProductBarcodes, ProductLabels, Exports, Notifications, Support(+TicketDetail).
+Componentes: `PermissionGate`, `RoleForm`, `PermissionsMatrix`, `OnboardingChecklist`, `SupplierForm`,
+`PurchaseForm`, `PurchaseItemsTable`, `ReceivePurchaseModal`, `ReturnWizard`, `ExchangeWizard`,
+`CustomerAccountSummary/MovementsTable`, `BranchForm`, `WarehouseForm`, `StockTransferForm`,
+`StockTransferStatusBadge`, `BarcodeManager`, `BarcodeSearchInput`, `LabelPreview`, `ExportButton/Filters`,
+`NotificationBell/Panel`, `SupportTicketForm`, `HelpCard`, `ContextualHelpBox`, `DangerConfirmDialog`, `HumanErrorMessage`.
+
+### Transacciones críticas (todo o nada, con rollback)
+Envolver en transacción DB: **recibir compra** (+ stock + movimientos + costo), **confirmar devolución**,
+**confirmar cambio de producto**, **pago de cuenta corriente**, **transferencia de stock** (salida y recepción),
+**anular venta** que afecte stock/caja, **ajuste manual de stock**.
+
+Ejemplo — **cambio de producto**: crear `return` + `return_items` + `exchange_items` → sumar stock del devuelto
+(si corresponde) → restar stock del nuevo → `inventory_movements` → calcular diferencia → `cash_movement`
+(si paga/devuelve) o `customer_account_movement` (si saldo) → actualizar estado de la venta → auditoría → commit.
+Si falla un paso: **rollback total** (sin stock/caja/cuenta corriente inconsistentes).
+
+### Datos críticos mínimos de onboarding
+No bloquear todo el sistema salvo que falten: negocio creado, primera sucursal, al menos un método de pago,
+y configuración básica de caja. Si faltan otros pasos, mostrar banner (no bloquear).
+
+### Errores humanos (no técnicos) — ejemplos
+"No se pudo confirmar la venta. Verificá la conexión e intentá nuevamente." · "No tenés permiso… Pedile
+autorización a un encargado." · "No hay stock suficiente. Otro usuario pudo haber vendido este producto." ·
+"Esta acción no se puede completar porque la caja está cerrada." · "Esta transferencia ya fue recibida." ·
+"Esta venta ya fue anulada." · "Este cliente superó el límite de cuenta corriente."
