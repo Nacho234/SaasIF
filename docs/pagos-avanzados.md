@@ -70,6 +70,27 @@ Con `calculate_fees`/`calculate_settlement_date`, al registrar el pago el sistem
 Ventas por método/procesador/terminal/marca/banco; comisiones estimadas; neto estimado;
 acreditaciones pendientes/por fecha; conciliación manual.
 
+## Servicios y frontend (del handoff)
+
+- **Servicios backend**: `paymentSettingsService`, `paymentMethodService`, `paymentProcessorService`,
+  `paymentTerminalService`, `cardBrandService`, `issuerBankService`, `paymentFeeService`, `settlementService`.
+  Todos filtran por `businessId` y validan permiso `manage_settings`/`manage_payment_methods`.
+- **Frontend (Ajustes)**: `PaymentSettingsPage`, `PaymentProcessorsPage`, `PaymentTerminalsPage`,
+  `CardBrandsPage`, `IssuerBanksPage`. Componentes: `PaymentSettingsForm`, `PaymentProcessorForm`,
+  `PaymentTerminalForm`, `CardBrandSelector`, `IssuerBankSelector`, `AdvancedPaymentFields`,
+  `PaymentMethodSelector`, `PaymentBreakdown`.
+- **En el POS**: `PaymentPanel` lee `payment_settings` → si `simple` muestra solo el selector de método; si
+  `advanced` monta `AdvancedPaymentFields` con **solo los campos activados**, y valida obligatorios **solo** los
+  `require_* = true`. En **pago mixto**, cada pago puede llevar sus propios datos avanzados.
+
+## MVP (qué sí / qué NO)
+
+- **MVP inicial**: métodos simples + toggle simple/avanzado + procesadores + terminales/marca/banco/operación
+  **opcionales** + pago mixto compatible. **Nunca obligatorios por defecto**: banco emisor, terminal, lote,
+  código de autorización, cupón, comisión, fecha de acreditación.
+- **Avanzado futuro**: comisiones automáticas, fechas de acreditación, reporte de liquidaciones, conciliación
+  manual, promociones por banco, control por terminal, importación de liquidaciones.
+
 ## Dependencias
 
 Requiere: dominio **Ventas/POS** en el backend (`sales`, `sale_items`) y el **frontend cableado**
