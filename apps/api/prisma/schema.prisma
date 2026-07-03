@@ -39,6 +39,14 @@ enum SubscriptionStatus {
   blocked
 }
 
+enum CashRegisterStatus {
+  open
+  closed
+  closed_with_difference
+  reopened
+  cancelled
+}
+
 /// Cada suscriptor = un negocio. Es la raíz del aislamiento multi-tenant.
 model Business {
   id        String         @id @default(cuid())
@@ -61,6 +69,8 @@ model Business {
   brands        Brand[]
   products      Product[]
   customers     Customer[]
+  cashRegisters CashRegister[]
+  cashMovements CashMovement[]
 
   @@map("businesses")
 }
@@ -240,4 +250,61 @@ model Customer {
 
   @@index([businessId])
   @@map("customers")
+}
+
+// --- Caja (dominio Cash) — aislado por businessId (+ branchId opcional) ---
+
+model CashRegister {
+  id           String             @id @default(cuid())
+  businessId   String
+  branchId     String?
+  number       String
+  openedAt     DateTime           @default(now())
+  closedAt     DateTime?
+  openedById   String
+  openedByName String
+  closedById   String?
+  closedByName String?
+  openingAmount Decimal           @default(0) @db.Decimal(14, 2)
+  expectedCash Decimal?           @db.Decimal(14, 2)
+  countedCash  Decimal?           @db.Decimal(14, 2)
+  difference   Decimal?           @db.Decimal(14, 2)
+  status       CashRegisterStatus @default(open)
+  openingNotes String             @default("")
+  closingNotes String             @default("")
+  reopenReason String             @default("")
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  business  Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  movements CashMovement[]
+
+  @@index([businessId])
+  @@index([businessId, status])
+  @@map("cash_registers")
+}
+
+model CashMovement {
+  id             String   @id @default(cuid())
+  businessId     String
+  cashRegisterId String
+  // type: opening | sale | manual_income | manual_expense | expense | withdrawal | refund | cancellation | debt_payment | correction | closing
+  type           String
+  direction      String // in | out
+  amount         Decimal  @db.Decimal(14, 2)
+  method         String   @default("cash")
+  reason         String   @default("")
+  userId         String
+  userName       String
+  relatedSaleId  String?
+  date           DateTime @default(now())
+  notes          String   @default("")
+  createdAt      DateTime @default(now())
+
+  business     Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  cashRegister CashRegister @relation(fields: [cashRegisterId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([cashRegisterId])
+  @@map("cash_movements")
 }
