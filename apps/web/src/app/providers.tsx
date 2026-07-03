@@ -1,8 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { useBusinessStore } from '@/store/businessStore';
-import { isDemoMode } from '@/config/appMode';
+import { useAuthStore } from '@/store/authStore';
+import { isDemoMode, isProdMode } from '@/config/appMode';
 import { seedDemoData } from '@/demo/demoDataService';
+import { restoreSupabaseSession } from '@/services/supabase/supabaseAuthService';
 import { applyDensity, applyPrimaryColor, applyThemeMode } from '@/utils/theme';
 import { ToastHost } from '@/components/ui/ToastHost';
 import { ConfirmDialogHost } from '@/components/ui/ConfirmDialogHost';
@@ -26,6 +28,17 @@ export function Providers({ children }: { children: ReactNode }) {
     if (isDemoMode && !useBusinessStore.getState().demoSeeded) seedDemoData();
     return true;
   });
+
+  // En prod, al cargar la app re-sincroniza la sesión con Supabase (si expiró, desloguea).
+  useEffect(() => {
+    if (!isProdMode) return;
+    restoreSupabaseSession()
+      .then((session) => {
+        if (session) useAuthStore.getState().setSession(session);
+        else useAuthStore.getState().clearSession();
+      })
+      .catch(() => useAuthStore.getState().clearSession());
+  }, []);
 
   useEffect(() => {
     applyPrimaryColor(settings.primaryColor);
