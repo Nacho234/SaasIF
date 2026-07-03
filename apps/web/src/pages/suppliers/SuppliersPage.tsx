@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Truck } from 'lucide-react';
 import { useSupplierStore } from '@/store/supplierStore';
 import { useProductStore } from '@/store/productStore';
+import { isProdMode } from '@/config/appMode';
+import { mirrorSupplier } from '@/services/supabase/supabaseSuppliersService';
 import { logAudit } from '@/services/auditService';
 import { toast } from '@/store/uiStore';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -57,8 +59,10 @@ export function SupplierFormModal({
       return;
     }
     if (editing) {
+      const updated = { ...editing, ...form, name: form.name.trim() };
       updateSupplier(editing.id, { ...form, name: form.name.trim() });
-      onSaved?.({ ...editing, ...form, name: form.name.trim() });
+      if (isProdMode) mirrorSupplier(updated);
+      onSaved?.(updated);
     } else {
       const supplier: Supplier = {
         id: generateId(),
@@ -68,6 +72,7 @@ export function SupplierFormModal({
         createdAt: new Date().toISOString(),
       };
       addSupplier(supplier);
+      if (isProdMode) mirrorSupplier(supplier);
       onSaved?.(supplier);
     }
     onClose();

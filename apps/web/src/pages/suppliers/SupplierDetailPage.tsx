@@ -3,6 +3,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ClipboardList, Package, Pencil, Plus, Power, Truck } from 'lucide-react';
 import { useSupplierStore } from '@/store/supplierStore';
 import { useProductStore } from '@/store/productStore';
+import { isProdMode } from '@/config/appMode';
+import { mirrorSupplier } from '@/services/supabase/supabaseSuppliersService';
 import { logAudit } from '@/services/auditService';
 import { toast, useUiStore } from '@/store/uiStore';
 import { formatMoney, formatFriendlyDateTime } from '@/utils/format';
@@ -50,6 +52,7 @@ export function SupplierDetailPage() {
       confirmLabel: supplier.isActive ? 'Desactivar' : 'Reactivar',
       onConfirm: () => {
         updateSupplier(supplier.id, { isActive: !supplier.isActive });
+        if (isProdMode) mirrorSupplier({ ...supplier, isActive: !supplier.isActive });
         toast.success(supplier.isActive ? 'Proveedor desactivado' : 'Proveedor reactivado');
       },
     });

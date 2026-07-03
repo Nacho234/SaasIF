@@ -4,6 +4,9 @@ import { useProductStore } from '@/store/productStore';
 import { useInventoryStore } from '@/store/inventoryStore';
 import { generateId } from '@/utils/id';
 import { logAudit } from './auditService';
+import { isProdMode } from '@/config/appMode';
+import { receivePurchaseSupabase } from './supabase/supabaseSuppliersService';
+import { toast } from '@/store/uiStore';
 
 /** Marca una compra como recibida: suma stock y actualiza costos. */
 export function receivePurchase(purchaseId: string): { ok: boolean; error?: string } {
@@ -44,6 +47,18 @@ export function receivePurchase(purchaseId: string): { ok: boolean; error?: stri
   }
 
   updatePurchase(purchase.id, { status: 'received', receivedAt: now });
+
+  if (isProdMode) {
+    const stockUpdates = purchase.items.map((i) => ({
+      productId: i.productId,
+      quantity: i.quantity,
+      unitCost: i.unitCost,
+    }));
+    void receivePurchaseSupabase(purchase.id, stockUpdates).catch(() =>
+      toast.error('No se pudo sincronizar la recepción', 'Quedó local; reintentá.'),
+    );
+  }
+
   logAudit({
     action: 'purchase_received',
     module: 'purchases',
