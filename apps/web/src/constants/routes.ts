@@ -32,6 +32,7 @@ export const ROUTES = {
   promotions: '/promociones',
   expenses: '/gastos',
   reports: '/reportes',
+  exports: '/exportaciones',
   users: '/usuarios',
   audit: '/auditoria',
   notifications: '/notificaciones',

@@ -35,6 +35,7 @@ import { PurchaseDetailPage } from '@/pages/purchases/PurchaseDetailPage';
 import { PromotionsPage } from '@/pages/promotions/PromotionsPage';
 import { ExpensesPage } from '@/pages/expenses/ExpensesPage';
 import { ReportsPage } from '@/pages/reports/ReportsPage';
+import { ExportsPage } from '@/pages/exports/ExportsPage';
 import { UsersPage } from '@/pages/users/UsersPage';
 import { AuditPage } from '@/pages/audit/AuditPage';
 import { NotificationsPage } from '@/pages/notifications/NotificationsPage';
@@ -221,6 +222,14 @@ export const router = createBrowserRouter([
         element: (
           <RequirePermission permission="view_reports">
             <ReportsPage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: ROUTES.exports,
+        element: (
+          <RequirePermission permission="view_reports">
+            <ExportsPage />
           </RequirePermission>
         ),
       },
