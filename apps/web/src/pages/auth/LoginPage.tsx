@@ -5,8 +5,8 @@ import { useAuthStore } from '@/store/authStore';
 import { useUserStore } from '@/store/userStore';
 import { useBusinessStore } from '@/store/businessStore';
 import { login } from '@/services/authService';
-import { loginApi, registerApi, type Session } from '@/services/api/authApiService';
-import { ApiError } from '@/services/api/apiClient';
+import { type Session } from '@/services/api/authApiService';
+import { loginSupabase, registerSupabase } from '@/services/supabase/supabaseAuthService';
 import { toast } from '@/store/uiStore';
 import { isDemoMode } from '@/config/appMode';
 import { ROUTES } from '@/constants/routes';
@@ -149,11 +149,11 @@ function RealAuthCard() {
     try {
       const session =
         tab === 'login'
-          ? await loginApi({ email, password })
-          : await registerApi({ businessName, ownerName, email, password });
+          ? await loginSupabase({ email, password })
+          : await registerSupabase({ businessName, ownerName, email, password });
       finish(session);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo conectar con el servidor.');
+      setError(err instanceof Error ? err.message : 'No se pudo conectar con el servidor.');
       setLoading(false);
     }
   };

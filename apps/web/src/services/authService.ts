@@ -1,7 +1,8 @@
 import { useAuthStore } from '@/store/authStore';
 import { useUserStore } from '@/store/userStore';
-import { isDemoMode } from '@/config/appMode';
+import { isDemoMode, isProdMode } from '@/config/appMode';
 import { logAudit } from './auditService';
+import { logoutSupabase } from './supabase/supabaseAuthService';
 
 export function login(userId: string): { ok: boolean; error?: string } {
   const { users, updateUser } = useUserStore.getState();
@@ -28,4 +29,6 @@ export function logout(): void {
   }
   // clearSession limpia user + token + businessId (sirve para demo y prod).
   useAuthStore.getState().clearSession();
+  // En prod, cerrar también la sesión de Supabase.
+  if (isProdMode) void logoutSupabase();
 }
