@@ -147,11 +147,73 @@ Si el negocio usa ARCA, la hoja de cierre muestra resumen fiscal: autorizadas / 
 total fiscal autorizado / total interno pendiente. Config: permitir cerrar con pendientes (default, con
 **advertencia** y registro) o exigir autorización fiscal completa antes de cerrar.
 
+### Servicios backend (encapsular ARCA aparte, para conectar lo real después)
+`fiscalInvoiceService` (crea/consulta/actualiza fiscal_invoice, guarda CAE/número/vencimiento, evita duplicados),
+`arcaService` (encapsula llamadas reales/simuladas: pedir CAE, consultar último autorizado, normalizar errores),
+`arcaAuthService` (WSAA/token), `arcaRetryService` (reintentos manuales y en cola, no sobre autorizados, valida
+timeout antes), `arcaAttemptService`, `fiscalErrorService`, `fiscalSettingsService` (modo seguro/operativo, punto
+de venta, CUIT, condición, comportamiento al cerrar caja), `receiptService` (ticket interno + comprobante fiscal +
+reimpresión; **no** crea ventas ni pide CAE), `receiptPdfService`, `printLogService`, `fiscalStatusService`,
+`fiscalValidationService`, `cashClosureFiscalService`, `auditService`, `notificationService`.
+
 ### Endpoints (fase Fiscal)
-`GET /api/fiscal/invoices` (+ `/pending`, `/errors`, `/:id`), `POST /api/fiscal/invoices/:id/retry`,
-`GET /api/fiscal/invoices/:id/pdf`, `POST /api/fiscal/invoices/:id/reprint`,
-`GET /api/sales/:id/fiscal-status`, `POST /api/sales/:id/retry-cae`,
-`POST /api/sales/:id/print-internal-ticket`, `POST /api/sales/:id/reprint`.
+`GET /api/fiscal/invoices` (+ `/pending`, `/errors`, `/authorized`, `/:id`, `/:id/attempts`, `/:id/audit`),
+`POST /api/fiscal/invoices/:id/retry`, `GET /api/fiscal/invoices/:id/pdf`, `POST /api/fiscal/invoices/:id/reprint`.
+Ventas: `GET /api/sales/:id/fiscal-status`, `POST /api/sales/:id/{request-cae,retry-cae,print-internal-ticket,reprint}`,
+`GET /api/sales/:id/receipt`. Cola de reintentos: `GET /api/fiscal/retry-queue`,
+`POST /api/fiscal/retry-queue/:id/{process,cancel}`, `POST /api/fiscal/retry-pending/process-all`.
+Config: `GET/PUT /api/settings/fiscal`, `POST /api/settings/fiscal/{test,validate}`.
+Caja: `GET /api/cash-registers/:id/fiscal-summary`, `POST /api/cash-registers/:id/validate-fiscal-pending`.
+
+### Permisos fiscales
+`view_fiscal_invoices`, `manage_fiscal_invoices`, `retry_cae`, `reprint_receipts`, `view_fiscal_errors`,
+`manage_fiscal_settings`, `close_cash_with_fiscal_pending`, `view_arca_attempts`, `download_fiscal_pdf`,
+`correct_fiscal_data`. (Dueño: todo. Admin: ver/reintentar/reimprimir/ver errores. Encargado: reimprimir/ver
+errores/reintentar si tiene permiso. Cajero: imprimir ticket interno + reimprimir si habilitado. Contador: ver +
+descargar PDF + exportar. Soporte SaaS: estado técnico solo con modo soporte autorizado, todo auditado.)
+
+### Frontend (módulo "Facturación")
+Páginas: `FiscalDashboardPage` (resumen: autorizados hoy / pendientes / con error / reintentos en cola / total
+fiscal autorizado / total interno pendiente + estado config ARCA + modo actual), `PendingInvoicesPage` (tabla +
+filtros + acción masiva "reintentar reintentables"), `FiscalErrorsPage`, `AuthorizedInvoicesPage`,
+`FiscalInvoiceDetailPage`, `FiscalRetryQueuePage`, `FiscalSettingsPage`. En venta: `SaleFiscalStatusPanel`. En
+caja: `CashFiscalSummaryPanel`. Componentes: `FiscalStatusBadge`, `FiscalErrorAlert`, `FiscalRetryButton`,
+`FiscalAttemptsTimeline`, `FiscalInvoiceTable`, `PendingCAECard`, `PrintLogTable`, `FiscalModeSelector`,
+`RetryCAEConfirmDialog`, `ReprintReceiptDialog`, `FiscalErrorDetailModal`, `FiscalSettingsForm`.
+
+### Reintento CAE — qué se puede y qué NO tocar (crítico)
+El reintento es una operación **separada** de la transacción de venta. **Solo puede modificar**: `fiscal_invoice`,
+`arca_attempts`, `fiscal_retry_queue`, `audit_logs`, `notifications`, `print_logs` (si imprime luego). **Nunca**:
+`sale_items`, `inventory_movements`, `cash_movements`, `stock`, ni el total de la venta.
+**Validaciones antes de reintentar**: la venta existe y es del `businessId`, no está anulada, no tiene CAE
+autorizado, existe `fiscal_invoice`, el total coincide, punto de venta y tipo de comprobante configurados, y el
+usuario tiene permiso. Si el error fue **timeout**, antes de pedir CAE consultar el último comprobante autorizado
+(CUIT + punto de venta + tipo); si ARCA ya lo autorizó → guardar CAE + marcar autorizado, sin pedir uno nuevo.
+
+### Arquitectura (la fiscal es una capa, no reemplaza ventas)
+`POS/Venta → venta interna → pago → stock → caja → ticket interno → factura fiscal (si corresponde)`. La venta
+interna se crea en una transacción (venta+items+pagos+stock+inventory+caja+ticket). **El pedido de CAE NO duplica
+esa transacción.** En modo operativo, si la factura falla la venta queda **pagada** y el comprobante **pendiente/
+con error** — no se deshace la venta.
+
+### Config fiscal (Ajustes → Facturación fiscal)
+Activar facturación, **modo** (seguro/operativo), CUIT, razón social, condición fiscal, punto de venta, tipo de
+comprobante default, certificado (estado + vencimiento), **ambiente** (testing/producción), permitir cerrar caja
+con pendientes, exigir autorización completa antes de cerrar, **reintentos automáticos** (on/off, cantidad máxima,
+intervalo). Secretos/claves nunca visibles en frontend (enmascarados).
+
+### Auditoría (taxonomía)
+`fiscal.cae.{requested,authorized,error,timeout,retry_requested,retry_success,retry_failed}`,
+`fiscal.invoice.reprinted`, `fiscal.internal_ticket.printed`, `fiscal.print.failed`, `fiscal.settings.updated`,
+`fiscal.data.corrected`, `fiscal.status.changed`, `fiscal.cash_close_with_pending`, `fiscal.cash_close_blocked_by_pending`.
+
+### Mensajes de error (humanos, no técnicos)
+Internet: "No se pudo contactar ARCA. Verificá la conexión y reintentá." · Timeout: "No se recibió respuesta de
+ARCA. Antes de reintentar, el sistema debe verificar si el comprobante fue autorizado." · CUIT: "El CUIT no es
+válido. Corregí los datos fiscales antes de reintentar." · Punto de venta: "El punto de venta configurado no es
+válido para este comprobante." · Certificado: "El certificado fiscal parece vencido. Revisá la configuración
+ARCA." · Token: "La sesión fiscal venció. El sistema intentará renovar el token." (Detalle técnico solo en logs /
+para soporte.)
 
 ## Dependencias
 
