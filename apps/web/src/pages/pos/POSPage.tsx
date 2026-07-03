@@ -276,7 +276,23 @@ export function POSPage() {
             ref={searchRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar por nombre, SKU o código de barras… (F2)"
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return;
+              const code = query.trim();
+              if (!code) return;
+              // Scanner: match exacto por código de barras o SKU; si no, único resultado visible.
+              const exact = products.find(
+                (p) => p.isActive && (p.barcode === code || p.sku.toLowerCase() === code.toLowerCase()),
+              );
+              const target = exact ?? (visibleProducts.length === 1 ? visibleProducts[0]! : null);
+              if (target) {
+                addProduct(target);
+                setQuery('');
+              } else {
+                toast.error('Sin resultados', 'No encontramos un producto con ese código de barras.');
+              }
+            }}
+            placeholder="Buscar o escanear código… (F2)"
             className="h-12 w-full rounded-xl border border-slate-300 bg-white pl-12 pr-4 text-base shadow-xs focus:outline-2 focus:outline-primary-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
             aria-label="Buscar producto"
           />
