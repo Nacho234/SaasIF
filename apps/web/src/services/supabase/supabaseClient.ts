@@ -5,8 +5,9 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
  * protege los datos). En modo demo no se usa (queda null). La sesión se persiste en
  * localStorage y el token se refresca solo.
  */
-const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+// import.meta.env?. con optional chaining para no romper fuera de Vite (ej. el smoke en Node).
+const url = import.meta.env?.VITE_SUPABASE_URL as string | undefined;
+const key = import.meta.env?.VITE_SUPABASE_ANON_KEY as string | undefined;
 
 export const supabase: SupabaseClient =
   url && key
