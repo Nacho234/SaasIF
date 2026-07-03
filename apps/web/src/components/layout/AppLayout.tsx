@@ -10,6 +10,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { isProdMode } from '@/config/appMode';
 import { loadCatalog } from '@/services/catalogService';
 import { loadCustomers } from '@/services/customerService';
+import { loadCustomerPayments } from '@/services/supabase/supabaseAccountService';
 import { loadCash } from '@/services/supabase/supabaseCashService';
 import { loadSales } from '@/services/supabase/supabaseSalesService';
 import { loadReturns } from '@/services/supabase/supabaseReturnsService';
@@ -32,6 +33,7 @@ export function AppLayout() {
     if (!isProdMode) return;
     loadCatalog().catch(() => toast.error('No se pudo cargar el catálogo', 'Revisá tu conexión con el servidor.'));
     loadCustomers().catch(() => toast.error('No se pudieron cargar los clientes', 'Revisá tu conexión con el servidor.'));
+    loadCustomerPayments().catch(() => {});
     loadCash().catch(() => toast.error('No se pudo cargar la caja', 'Revisá tu conexión con el servidor.'));
     loadSales().catch(() => toast.error('No se pudieron cargar las ventas', 'Revisá tu conexión con el servidor.'));
     loadReturns().catch(() => {});
