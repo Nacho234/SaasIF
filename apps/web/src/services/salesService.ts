@@ -12,6 +12,9 @@ import { logAudit } from './auditService';
 import { checkStockAlerts, pushNotification } from './notificationService';
 import { getOpenRegister } from './cashRegisterService';
 import { ROUTES } from '@/constants/routes';
+import { isProdMode } from '@/config/appMode';
+import { createSaleSupabase } from './supabase/supabaseSalesService';
+import { toast } from '@/store/uiStore';
 
 export interface CartLine {
   lineId: string;
@@ -255,14 +258,16 @@ export function confirmSale(draft: SaleDraft): { ok: boolean; error?: string; sa
   applyStockForSale(sale, 'out', `Venta ${sale.saleNumber}`, 'sale');
 
   // Movimientos de caja: uno por método de pago (efectivo neto de vuelto).
+  const cashMovementsForRpc: { id: string; cashRegisterId: string; method: PaymentMethodId; amount: number }[] = [];
   if (register) {
     const cashStore = useCashStore.getState();
     for (const payment of sale.payments) {
       if (payment.method === 'customer_credit') continue;
       const amount = payment.method === 'cash' ? round2(payment.amount - change) : payment.amount;
       if (amount <= 0) continue;
+      const movementId = generateId();
       cashStore.addMovement({
-        id: generateId(),
+        id: movementId,
         cashRegisterId: register.id,
         type: 'sale',
         direction: 'in',
@@ -275,6 +280,7 @@ export function confirmSale(draft: SaleDraft): { ok: boolean; error?: string; sa
         date: now,
         notes: '',
       });
+      cashMovementsForRpc.push({ id: movementId, cashRegisterId: register.id, method: payment.method, amount });
     }
   }
 
@@ -287,6 +293,47 @@ export function confirmSale(draft: SaleDraft): { ok: boolean; error?: string; sa
       type: 'pending_debt',
       actionUrl: ROUTES.customerDetail(customer.id),
     });
+  }
+
+  // En prod: persistir la venta de forma atómica en Supabase (RPC create_sale).
+  if (isProdMode) {
+    const stockMap = new Map<string, number>();
+    for (const item of sale.items) {
+      if (item.isCombo && item.comboComponents) {
+        for (const comp of item.comboComponents) {
+          stockMap.set(comp.productId, (stockMap.get(comp.productId) ?? 0) + comp.quantity * item.quantity);
+        }
+      } else {
+        stockMap.set(item.productId, (stockMap.get(item.productId) ?? 0) + item.quantity);
+      }
+    }
+    const stockDeltas = [...stockMap].map(([productId, qty]) => ({ productId, qty }));
+    const payload = {
+      id: sale.id,
+      saleNumber: sale.saleNumber,
+      date: sale.date,
+      customerId: sale.customerId,
+      customerName: sale.customerName,
+      sellerId: sale.sellerId,
+      sellerName: sale.sellerName,
+      cashRegisterId: sale.cashRegisterId || null,
+      subtotal: sale.subtotal,
+      discountTotal: sale.discountTotal,
+      surchargeTotal: sale.surchargeTotal,
+      total: sale.total,
+      payments: sale.payments,
+      cashReceived: sale.cashReceived,
+      change: sale.change,
+      notes: sale.notes,
+      promotionId: sale.promotionId,
+      items: sale.items,
+      stockDeltas,
+      cashMovements: cashMovementsForRpc,
+      customerDebtDelta: creditAmount,
+    };
+    void createSaleSupabase(payload).catch(() =>
+      toast.error('No se pudo sincronizar la venta', 'Se registró localmente pero falló guardarla en el servidor.'),
+    );
   }
 
   logAudit({
