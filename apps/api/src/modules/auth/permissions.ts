@@ -5,6 +5,9 @@ export type Permission =
   | 'sell'
   | 'open_cash'
   | 'close_cash'
+  | 'view_cash'
+  | 'manage_cash_movements'
+  | 'reopen_cash'
   | 'register_expenses'
   | 'create_discount'
   | 'cancel_sale'
@@ -20,9 +23,10 @@ export type Permission =
   | 'reset_demo';
 
 const ALL: Permission[] = [
-  'sell', 'open_cash', 'close_cash', 'register_expenses', 'create_discount', 'cancel_sale',
-  'create_return', 'edit_products', 'adjust_stock', 'manage_purchases', 'manage_customers',
-  'view_reports', 'manage_users', 'manage_settings', 'view_audit', 'reset_demo',
+  'sell', 'open_cash', 'close_cash', 'view_cash', 'manage_cash_movements', 'reopen_cash',
+  'register_expenses', 'create_discount', 'cancel_sale', 'create_return', 'edit_products',
+  'adjust_stock', 'manage_purchases', 'manage_customers', 'view_reports', 'manage_users',
+  'manage_settings', 'view_audit', 'reset_demo',
 ];
 
 /**
@@ -32,9 +36,9 @@ const ALL: Permission[] = [
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   admin: ALL,
   manager: [
-    'sell', 'open_cash', 'close_cash', 'register_expenses', 'create_discount', 'cancel_sale',
-    'create_return', 'edit_products', 'adjust_stock', 'manage_purchases', 'manage_customers',
-    'view_reports',
+    'sell', 'open_cash', 'close_cash', 'view_cash', 'manage_cash_movements',
+    'register_expenses', 'create_discount', 'cancel_sale', 'create_return', 'edit_products',
+    'adjust_stock', 'manage_purchases', 'manage_customers', 'view_reports',
   ],
   seller: ['sell'],
 };
