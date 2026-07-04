@@ -7,6 +7,7 @@ import { DeleteBusinessModal } from './DeleteBusinessModal';
 import { logAudit } from '@/services/auditService';
 import { isProdMode } from '@/config/appMode';
 import { saveSettings } from '@/services/supabase/supabaseSettingsService';
+import { MercadoPagoCard } from '@/components/settings/MercadoPagoCard';
 import { toast } from '@/store/uiStore';
 import { BUSINESS_CATEGORIES, PRESET_COLORS } from '@/constants/demo';
 import { PAYMENT_METHODS } from '@/constants/paymentMethods';
@@ -205,6 +206,8 @@ export function SettingsPage() {
               ))}
             </CardBody>
           </Card>
+
+          <MercadoPagoCard />
         </div>
       )}
 
