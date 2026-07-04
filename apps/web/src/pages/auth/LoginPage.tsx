@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { ArrowRight, FlaskConical, LogIn, Store, UserPlus, WifiOff } from 'lucide-react';
+import { ArrowRight, FlaskConical, LogIn, Store, WifiOff } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useUserStore } from '@/store/userStore';
 import { useBusinessStore } from '@/store/businessStore';
 import { login } from '@/services/authService';
 import { type Session } from '@/services/api/authApiService';
-import { loginSupabase, registerSupabase } from '@/services/supabase/supabaseAuthService';
+import { loginSupabase } from '@/services/supabase/supabaseAuthService';
 import { toast } from '@/store/uiStore';
 import { isDemoMode } from '@/config/appMode';
 import { ROUTES } from '@/constants/routes';
@@ -126,9 +126,6 @@ function RealAuthCard() {
   const updateSettings = useBusinessStore((s) => s.updateSettings);
   const completeOnboarding = useBusinessStore((s) => s.completeOnboarding);
 
-  const [tab, setTab] = useState<'login' | 'register'>('login');
-  const [businessName, setBusinessName] = useState('');
-  const [ownerName, setOwnerName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -147,11 +144,7 @@ function RealAuthCard() {
     setError('');
     setLoading(true);
     try {
-      const session =
-        tab === 'login'
-          ? await loginSupabase({ email, password })
-          : await registerSupabase({ businessName, ownerName, email, password });
-      finish(session);
+      finish(await loginSupabase({ email, password }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo conectar con el servidor.');
       setLoading(false);
@@ -160,38 +153,21 @@ function RealAuthCard() {
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-pop dark:border-slate-800 dark:bg-slate-900">
-      <div className="mb-4 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
-        <button
-          onClick={() => { setTab('login'); setError(''); }}
-          className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-semibold transition-colors ${tab === 'login' ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' : 'text-slate-500'}`}
-        >
-          <LogIn className="size-4" aria-hidden /> Ingresar
-        </button>
-        <button
-          onClick={() => { setTab('register'); setError(''); }}
-          className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-semibold transition-colors ${tab === 'register' ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' : 'text-slate-500'}`}
-        >
-          <UserPlus className="size-4" aria-hidden /> Crear cuenta
-        </button>
+      <div className="mb-4 flex items-center justify-center gap-1.5 text-sm font-semibold text-slate-900 dark:text-white">
+        <LogIn className="size-4" aria-hidden /> Iniciar sesión
       </div>
 
       <form onSubmit={submit} className="flex flex-col gap-3">
-        {tab === 'register' && (
-          <>
-            <Input label="Nombre del negocio" required value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Ej: Petshop Patitas" autoFocus />
-            <Input label="Tu nombre" required value={ownerName} onChange={(e) => setOwnerName(e.target.value)} />
-          </>
-        )}
-        <Input label="Email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" autoFocus={tab === 'login'} />
-        <Input label="Contraseña" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={tab === 'login' ? 'current-password' : 'new-password'} hint={tab === 'register' ? 'Mínimo 8 caracteres' : undefined} />
+        <Input label="Email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" autoFocus />
+        <Input label="Contraseña" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
         {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700 dark:bg-red-950 dark:text-red-300">{error}</p>}
         <Button type="submit" size="lg" fullWidth loading={loading} className="mt-1">
-          {tab === 'login' ? 'Ingresar' : 'Crear cuenta y empezar'}
+          Ingresar
         </Button>
       </form>
 
       <p className="mt-4 text-center text-xs text-slate-400 dark:text-slate-500">
-        {tab === 'login' ? 'Tu sesión y tus datos se guardan de forma segura en el servidor.' : 'Al crear la cuenta se genera tu negocio con una prueba gratuita.'}
+        ¿No tenés cuenta? Se crea desde la página de suscripción al contratar el plan.
       </p>
     </div>
   );

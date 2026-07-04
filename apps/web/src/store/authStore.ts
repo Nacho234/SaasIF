@@ -9,8 +9,13 @@ interface AuthState {
   token: string | null;
   /** Id del negocio en el backend (solo prod). */
   businessId: string | null;
+  /** Suscripción activa (candado). Default true: demo y estados sin dato no bloquean. */
+  subscriptionActive: boolean;
+  /** Estado crudo de la suscripción (trial/active/past_due/…) para mensajes. */
+  subscriptionStatus: string | null;
   setUser: (user: User | null) => void;
   setSession: (session: { user: User; token: string; businessId: string }) => void;
+  setSubscription: (sub: { active: boolean; status: string | null }) => void;
   clearSession: () => void;
 }
 
@@ -20,9 +25,13 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       token: null,
       businessId: null,
+      subscriptionActive: true,
+      subscriptionStatus: null,
       setUser: (user) => set({ user }),
       setSession: ({ user, token, businessId }) => set({ user, token, businessId }),
-      clearSession: () => set({ user: null, token: null, businessId: null }),
+      setSubscription: ({ active, status }) => set({ subscriptionActive: active, subscriptionStatus: status }),
+      clearSession: () =>
+        set({ user: null, token: null, businessId: null, subscriptionActive: true, subscriptionStatus: null }),
     }),
     { name: storageKey('auth') },
   ),

@@ -4,6 +4,8 @@ import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { MobileNav } from './MobileNav';
 import { GlobalSearch } from './GlobalSearch';
+import { SubscriptionBlocked } from './SubscriptionBlocked';
+import { useAuthStore } from '@/store/authStore';
 import { useUiStore } from '@/store/uiStore';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -25,6 +27,8 @@ export function AppLayout() {
   const setGlobalSearchOpen = useUiStore((s) => s.setGlobalSearchOpen);
   const navigate = useNavigate();
   const { can } = usePermissions();
+  const subscriptionActive = useAuthStore((s) => s.subscriptionActive);
+  const blocked = isProdMode && !subscriptionActive;
 
   useKeyboardShortcuts({
     'ctrl+k': () => setGlobalSearchOpen(true),
@@ -33,7 +37,7 @@ export function AppLayout() {
 
   // En modo prod, trae catálogo y clientes del backend al entrar (en demo ya está sembrado).
   useEffect(() => {
-    if (!isProdMode) return;
+    if (!isProdMode || blocked) return;
     loadCatalog().catch(() => toast.error('No se pudo cargar el catálogo', 'Revisá tu conexión con el servidor.'));
     loadCustomers().catch(() => toast.error('No se pudieron cargar los clientes', 'Revisá tu conexión con el servidor.'));
     loadCustomerPayments().catch(() => {});
@@ -46,6 +50,8 @@ export function AppLayout() {
     loadNotifications().catch(() => {});
     loadSettings().catch(() => {});
   }, []);
+
+  if (blocked) return <SubscriptionBlocked />;
 
   return (
     <div className="flex min-h-dvh">

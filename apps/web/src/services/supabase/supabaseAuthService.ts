@@ -1,7 +1,26 @@
 import type { Role, User } from '@/types';
 import { DEFAULT_ROLE_PERMISSIONS } from '@/constants/permissions';
+import { useAuthStore } from '@/store/authStore';
 import { supabase } from './supabaseClient';
 import type { LoginInput, RegisterInput, Session } from '../api/authApiService';
+
+interface SubRow {
+  status: string;
+  trialEndsAt: string | null;
+  currentPeriodEnd: string | null;
+}
+
+/**
+ * El candado. Bloquea solo estados explícitos de impago o vencidos; si no hay dato,
+ * NO bloquea (la landing es la fuente de verdad del estado; evitamos lockouts por bug).
+ */
+function isSubscriptionActive(sub: SubRow | null): boolean {
+  if (!sub) return true;
+  if (['past_due', 'cancelled', 'expired', 'blocked'].includes(sub.status)) return false;
+  const end = sub.status === 'trial' ? sub.trialEndsAt : sub.currentPeriodEnd;
+  if (end && new Date(end).getTime() < Date.now()) return false;
+  return true;
+}
 
 /** Traduce errores comunes de Supabase Auth a mensajes claros en español. */
 function friendlyError(message: string): string {
@@ -46,6 +65,17 @@ async function buildSession(): Promise<Session> {
     .select('id, name')
     .eq('id', profile.businessId)
     .single();
+
+  // Candado de suscripción: la landing crea la cuenta y setea el estado; acá solo verificamos.
+  const { data: sub } = await supabase
+    .from('subscriptions')
+    .select('status, trialEndsAt, currentPeriodEnd')
+    .eq('businessId', profile.businessId)
+    .maybeSingle();
+  useAuthStore.getState().setSubscription({
+    active: isSubscriptionActive((sub as SubRow | null) ?? null),
+    status: (sub as SubRow | null)?.status ?? null,
+  });
 
   return {
     user: toUser(profile.id, session.user.email ?? '', profile.name, profile.role),
