@@ -144,6 +144,8 @@ export function SettingsPage() {
               </div>
             </CardBody>
           </Card>
+
+          <MercadoPagoCard />
         </div>
       )}
 
@@ -206,8 +208,6 @@ export function SettingsPage() {
               ))}
             </CardBody>
           </Card>
-
-          <MercadoPagoCard />
         </div>
       )}
 

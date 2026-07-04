@@ -42,6 +42,18 @@ Deno.serve(async (req) => {
   const tok = await tr.json();
   if (!tok.access_token) return back("error");
 
+  // Traer datos de la cuenta MP (nickname/email) para mostrarlos
+  let nickname = "";
+  let email = "";
+  try {
+    const meRes = await fetch("https://api.mercadopago.com/users/me", {
+      headers: { Authorization: `Bearer ${tok.access_token}` },
+    });
+    const me = await meRes.json();
+    nickname = me.nickname ?? "";
+    email = me.email ?? "";
+  } catch (_) { /* datos opcionales */ }
+
   // Guardar (service_role; el frontend nunca ve el token)
   await fetch(`${SB}/rest/v1/mp_connections`, {
     method: "POST",
@@ -57,6 +69,8 @@ Deno.serve(async (req) => {
       refreshToken: tok.refresh_token ?? null,
       mpUserId: String(tok.user_id ?? ""),
       publicKey: tok.public_key ?? null,
+      nickname,
+      email,
       expiresAt: new Date(Date.now() + (tok.expires_in ?? 0) * 1000).toISOString(),
       connected: true,
       updatedAt: new Date().toISOString(),
