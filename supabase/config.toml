@@ -1,0 +1,12 @@
+# Config de Supabase CLI. `project_id` es sólo el nombre local del proyecto;
+# el linkeo real se hace con `supabase link --project-ref <ref>`.
+project_id = "mostrador"
+
+# create-checkout: la llama el usuario ya logueado desde la landing → exige JWT.
+[functions.create-checkout]
+verify_jwt = true
+
+# mp-webhook: lo llama Mercado Pago (sin nuestro JWT) → sin verificación de JWT.
+# La seguridad viene de re-consultar el pago a la API de MP con el access token.
+[functions.mp-webhook]
+verify_jwt = false
