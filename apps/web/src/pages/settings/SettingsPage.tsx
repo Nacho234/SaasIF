@@ -108,6 +108,8 @@ export function SettingsPage() {
             </CardBody>
           </Card>
 
+          <MercadoPagoCard />
+
           <Card>
             <CardHeader title="Logo" subtitle="Logo mock: subí una imagen o usá el ícono por defecto" />
             <CardBody className="flex items-center gap-4">
@@ -144,8 +146,6 @@ export function SettingsPage() {
               </div>
             </CardBody>
           </Card>
-
-          <MercadoPagoCard />
         </div>
       )}
 
